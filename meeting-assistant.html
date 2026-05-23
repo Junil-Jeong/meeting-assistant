@@ -152,6 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
   </div>
 </div>
 
+<div id="micStatus" style="display:none;padding:8px 20px;background:rgba(248,113,113,.1);border-bottom:0.5px solid rgba(248,113,113,.25);color:#f87171;font-size:12px;line-height:1.6;flex-shrink:0"></div>
 <div class="panels">
   <div class="panel">
     <div class="ph">
@@ -416,19 +417,28 @@ function copyCmd(tid,bid){
 
 // ── Mic ──
 function toggleMic(){running?stopMic():startMic();}
-async function startMic(){
+function startMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){alert("Chrome 브라우저에서만 음성인식이 가능합니다.");return;}
-  if(location.protocol==='file:'){document.getElementById('serverModal').classList.add('show');return;}
-  try{const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});s.getTracks().forEach(t=>t.stop());}
-  catch(e){alert("마이크 권한이 필요합니다.\n주소창 🔒 → 마이크 → 허용 후 새로고침");return;}
-  stopDemo();running=true;
+  if(!SR){
+    showMicError('이 브라우저는 음성인식을 지원하지 않습니다. Chrome을 사용해주세요.');
+    return;
+  }
+  if(location.protocol==='file:'){
+    document.getElementById('serverModal').classList.add('show');
+    return;
+  }
+  hideMicError();stopDemo();running=true;
   setStatus('live','🔴 녹음 중');
   document.getElementById('startBtn').textContent='■ STOP';
   document.getElementById('startBtn').className='btn btn-stop';
   enableQA();clearHint('tb');
-  rec=new (window.SpeechRecognition||window.webkitSpeechRecognition)();
-  rec.continuous=true;rec.interimResults=true;rec.lang=document.getElementById('langSel').value;
+
+  rec=new SR();
+  rec.continuous=true;
+  rec.interimResults=true;
+  rec.lang=document.getElementById('langSel').value;
+
+  rec.onstart=()=>{ hideMicError(); };
   rec.onresult=(e)=>{
     let fin='',interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
@@ -438,9 +448,35 @@ async function startMic(){
     if(fin){transcript+=fin;appendFinal(fin);scheduleQDetect(fin);}
     showInterim(interim);
   };
-  rec.onerror=(e)=>{if(e.error!=='no-speech')console.warn('SR:',e.error);};
-  rec.onend=()=>{if(running)rec.start();};
+  rec.onerror=(e)=>{
+    console.warn('SR error:',e.error);
+    if(e.error==='not-allowed'||e.error==='permission-denied'){
+      stopMic();
+      showMicError('⛔ 마이크 권한이 거부됐습니다. 주소창 왼쪽 🔒 아이콘 → 마이크 → 허용 후 다시 START를 눌러주세요.');
+    } else if(e.error==='no-speech'){
+      // 정상 — 무시
+    } else if(e.error==='audio-capture'){
+      stopMic();
+      showMicError('⛔ 마이크를 찾을 수 없습니다. 마이크가 연결돼 있는지 확인해주세요.');
+    } else if(e.error==='network'){
+      stopMic();
+      showMicError('⛔ 네트워크 오류로 음성인식이 중단됐습니다. 다시 START를 눌러주세요.');
+    } else {
+      showMicError('⚠️ 오류: '+e.error+' — 다시 START를 눌러주세요.');
+    }
+  };
+  rec.onend=()=>{if(running) rec.start();};
   rec.start();
+}
+function showMicError(msg){
+  const el=document.getElementById('micStatus');
+  if(!el){ console.warn('micError:', msg); return; }
+  el.innerHTML=msg;
+  el.style.display='block';
+}
+function hideMicError(){
+  const el=document.getElementById('micStatus');
+  if(el) el.style.display='none';
 }
 function stopMic(){
   running=false;if(rec){rec.stop();rec=null;}
