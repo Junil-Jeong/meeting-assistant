@@ -129,7 +129,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 
 <div class="apibar">
   <span class="apibar-label">🔑 Anthropic API Key</span>
-  <input class="apibar-input" id="apiKeyInput" type="password" placeholder="sk-ant-api03-...">
+  <input class="apibar-input" id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." oninput="autoSaveKey(this.value)">
   <button class="apibar-save" onclick="saveApiKey()">저장</button>
   <span class="apibar-st" id="apiSt"></span>
   <a class="apibar-link" href="https://console.anthropic.com/settings/keys" target="_blank">키 발급 →</a>
@@ -383,16 +383,27 @@ function setCompany(c){
 }
 
 // ── API Key ──
+function autoSaveKey(val){
+  val=val.trim();
+  if(val.length >= 20 && (val.startsWith('sk-') || val.startsWith('sk-ant-'))){
+    API_KEY=val;
+    const st=document.getElementById('apiSt');
+    st.className='apibar-st ok';
+    st.textContent='✅ 저장됨';
+    enableQA();
+  }
+}
 function saveApiKey(){
   const val=document.getElementById('apiKeyInput').value.trim();
   const st=document.getElementById('apiSt');
-  if(!val){st.className='apibar-st err';st.textContent='키 입력 필요';return;}
-  if(!val.startsWith('sk-ant-')){st.className='apibar-st err';st.textContent='형식 오류';return;}
+  if(!val){st.className='apibar-st err';st.textContent='키를 입력하세요';return;}
+  if(val.length < 20){st.className='apibar-st err';st.textContent='키가 너무 짧습니다';return;}
   API_KEY=val;
   st.className='apibar-st ok';
-  st.textContent='✅ 저장됨 — AI 답변 활성화';
-  document.getElementById('apiKeyInput').value='sk-ant-...'+val.slice(-4);
+  st.textContent='✅ 저장됨';
+  document.getElementById('apiKeyInput').value=val.substring(0,12)+'...'+val.slice(-4);
   enableQA();
+  console.log('API Key saved, length:', val.length);
 }
 document.getElementById('apiKeyInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
 
@@ -606,7 +617,7 @@ async function ask(){
   const a=document.createElement('div');a.className='msg a';
   a.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
   msgs.appendChild(a);msgs.scrollTop=msgs.scrollHeight;
-  if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단에 API Key를 입력해주세요</span>';return;}
+  if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단 API Key 입력창에 키를 입력 후 저장 버튼을 눌러주세요.</span>';return;}
   const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
   const meetingCtx=transcript.slice(-2000)||'(없음)';
   try{
