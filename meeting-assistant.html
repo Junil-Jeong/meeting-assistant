@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Assistant — Interview AI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f12;--bg2:#141720;--bg3:#1c2030;--border:#2a2f3d;
+  --accent:#4f8ef7;--accent2:#34d399;--accent3:#f59e0b;--accent4:#c084fc;
+  --text:#e2e8f0;--muted:#6b7a99;--danger:#f87171;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;position:relative}
+.topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0;gap:10px}
+.logo{font-size:14px;font-weight:700;white-space:nowrap}.logo em{color:var(--accent);font-style:normal}
+.logo sub{font-size:10px;color:var(--muted);font-weight:400;margin-left:5px}
+.topbar-mid{display:flex;align-items:center;gap:8px;flex:1;justify-content:center}
+.company-btn{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .18s}
+.company-btn.active{background:var(--accent4);color:#0d0f12;border-color:var(--accent4)}
+.company-btn:hover:not(.active){border-color:var(--accent4);color:var(--accent4)}
+.btns{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.badge{font-size:11px;padding:3px 9px;border-radius:4px;font-weight:600}
+.badge.idle{background:#1e2433;color:var(--muted);border:1px solid var(--border)}
+.badge.live{background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.4)}
+.badge.live::before{content:'●';margin-right:4px;font-size:8px;animation:bp 1s infinite}
+.badge.demo{background:rgba(245,158,11,.15);color:var(--accent3);border:1px solid rgba(245,158,11,.4)}
+.badge.demo::before{content:'●';margin-right:4px;font-size:8px;animation:bp .8s infinite}
+@keyframes bp{0%,100%{opacity:1}50%{opacity:.15}}
+.btn{padding:7px 15px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all .18s}
+.btn-demo{background:rgba(245,158,11,.12);color:var(--accent3);border:1px solid rgba(245,158,11,.4)}.btn-demo:hover{background:rgba(245,158,11,.25)}
+.btn-start{background:var(--accent);color:#fff}.btn-start:hover{background:#2e7de8}
+.btn-stop{background:var(--danger);color:#fff}.btn-stop:hover{background:#e04040}
+.lang-sel{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:5px 8px;font-size:11px;font-family:inherit;cursor:pointer;outline:none}
+.apibar{display:flex;align-items:center;gap:8px;padding:7px 18px;background:rgba(245,158,11,.06);border-bottom:1px solid rgba(245,158,11,.18);flex-shrink:0}
+.apibar-label{font-size:11px;color:var(--accent3);font-weight:700;white-space:nowrap}
+.apibar-input{flex:1;background:var(--bg3);border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Courier New',monospace;outline:none}
+.apibar-input::placeholder{color:var(--muted);font-family:'Segoe UI',sans-serif}
+.apibar-save{padding:4px 12px;background:var(--accent3);border:none;border-radius:5px;color:#0d0f12;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.apibar-st{font-size:11px;white-space:nowrap;min-width:55px}
+.apibar-st.ok{color:var(--accent2)}.apibar-st.err{color:var(--danger)}
+.apibar-link{font-size:11px;color:var(--muted);text-decoration:none;white-space:nowrap}
+.apibar-link:hover{color:var(--accent3);text-decoration:underline}
+.panels{flex:1;display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);overflow:hidden}
+.panel{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.panel-full{grid-column:1/-1}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.ptitle{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:7px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%}
+.dot-b{background:var(--accent)}.dot-p{background:var(--accent4)}.dot-a{background:var(--accent3)}
+.pbody{flex:1;overflow-y:auto;padding:14px;scroll-behavior:smooth}
+.pbody::-webkit-scrollbar{width:4px}
+.pbody::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.hint{color:var(--muted);font-size:12px;text-align:center;margin-top:28px;line-height:2.1}
+.ttext{font-family:'Courier New',monospace;font-size:13px;line-height:1.9;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.ttext.interim{color:rgba(107,122,153,.65);font-style:italic}
+.cursor{display:inline-block;width:2px;height:13px;background:var(--accent);vertical-align:middle;animation:blink .65s infinite;margin-left:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.pact{font-size:10px;color:var(--muted);padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;font-family:inherit}
+.pact:hover{background:var(--bg3);color:var(--text)}
+.ai-card{margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid rgba(192,132,252,.25);animation:cardIn .3s ease}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ai-card-head{display:flex;align-items:flex-start;justify-content:space-between;padding:9px 13px;background:rgba(192,132,252,.1);border-bottom:1px solid rgba(192,132,252,.2);gap:8px}
+.ai-card-q{font-size:11.5px;color:var(--accent4);font-weight:600;flex:1;line-height:1.5}
+.ai-card-tags{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.ai-tag{font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(192,132,252,.2);color:var(--accent4);white-space:nowrap;font-weight:600}
+.ai-tag.topic{background:rgba(52,211,153,.15);color:var(--accent2)}
+.ai-card-body{padding:12px 14px;background:var(--bg2)}
+.ai-card-ans{font-size:13px;line-height:1.8;color:var(--text)}
+.ai-tip{margin-top:10px;padding:8px 11px;background:rgba(79,142,247,.08);border-left:2px solid var(--accent);border-radius:0 6px 6px 0;font-size:11.5px;color:var(--muted);line-height:1.65}
+.ai-tip strong{color:var(--accent)}
+.qa{display:flex;flex-direction:column;min-height:0}
+.qamsgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.qamsgs::-webkit-scrollbar{width:4px}
+.qamsgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.msg{padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.65;max-width:86%}
+.msg.u{background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.2);align-self:flex-end;color:var(--accent)}
+.msg.a{background:var(--bg2);border:1px solid var(--border);align-self:flex-start;color:var(--text)}
+.qainput-row{display:flex;gap:8px;padding:10px 14px;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0}
+#qi{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
+#qi:focus{border-color:var(--accent)}
+#qi::placeholder{color:var(--muted)}
+#qi:disabled{opacity:.4;cursor:not-allowed}
+#ab{padding:8px 14px;background:var(--accent3);border:none;border-radius:6px;color:#0d0f12;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .18s}
+#ab:hover:not(:disabled){background:#d48800}
+#ab:disabled{opacity:.4;cursor:not-allowed}
+.thinking{display:flex;gap:5px;align-items:center;padding:4px 0}
+.thinking span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:tb .9s infinite}
+.thinking span:nth-child(2){animation-delay:.15s}.thinking span:nth-child(3){animation-delay:.3s}
+@keyframes tb{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,.82);z-index:200;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;width:480px;max-width:94%;animation:mup .22s ease}
+@keyframes mup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.modal-badge{display:inline-flex;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--danger);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;margin-bottom:12px}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:8px}
+.modal-desc{font-size:12.5px;color:var(--muted);line-height:1.8;margin-bottom:18px}
+.modal-desc strong{color:var(--text)}
+.method{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
+.method-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.method-step{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px}.method-step:last-child{margin-bottom:0}
+.step-n{min-width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-txt{font-size:12px;color:var(--text);line-height:1.65}
+.cmd-row{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:7px 11px;margin-top:7px}
+.cmd-text{font-family:'Courier New',monospace;font-size:11.5px;color:var(--accent3);flex:1}
+.copy-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .15s}
+.copy-btn.ok{color:var(--accent2);border-color:rgba(52,211,153,.4)}
+.mbtn{width:100%;padding:11px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;font-family:inherit;margin-top:8px}
+.mbtn-close{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}.mbtn-close:hover{background:var(--border);color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><em>Meeting</em> Assistant<sub>Interview AI</sub></div>
+  <div class="topbar-mid">
+    <span style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em">Company:</span>
+    <button class="company-btn active" id="btnLam" onclick="setCompany('lam')">Lam Research</button>
+    <button class="company-btn" id="btnPure" onclick="setCompany('pure')">Pure Storage</button>
+  </div>
+  <div class="btns">
+    <select class="lang-sel" id="langSel"><option value="en-US">🇺🇸 English</option><option value="ko-KR">🇰🇷 한국어</option></select>
+    <span id="badge" class="badge idle">대기 중</span>
+    <button class="btn btn-demo" id="demoBtn" onclick="toggleDemo()">🧪 DEMO</button>
+    <button class="btn btn-start" id="startBtn" onclick="toggleMic()">▶ START</button>
+  </div>
+</div>
+
+<div class="apibar">
+  <span class="apibar-label">🔑 Anthropic API Key</span>
+  <input class="apibar-input" id="apiKeyInput" type="password" placeholder="sk-ant-api03-...">
+  <button class="apibar-save" onclick="saveApiKey()">저장</button>
+  <span class="apibar-st" id="apiSt"></span>
+  <a class="apibar-link" href="https://console.anthropic.com/settings/keys" target="_blank">키 발급 →</a>
+</div>
+
+<div class="overlay" id="serverModal">
+  <div class="modal">
+    <div class="modal-badge">⚠️ file:// 프로토콜 제한</div>
+    <div class="modal-title">로컬 서버에서 실행이 필요합니다</div>
+    <div class="modal-desc">Chrome 보안 정책상 <strong>file://</strong>로 열린 파일에서는 마이크가 작동하지 않습니다.</div>
+    <div class="method">
+      <div class="method-title">🐍 Python으로 실행</div>
+      <div class="method-step"><span class="step-n">1</span><span class="step-txt">HTML 파일이 있는 폴더에서 터미널 열기</span></div>
+      <div class="method-step"><span class="step-n">2</span><span class="step-txt">아래 명령어 실행 후 Enter</span></div>
+      <div class="cmd-row"><span class="cmd-text" id="pyCmd">python3 -m http.server 8080</span><button class="copy-btn" id="pyBtn" onclick="copyCmd('pyCmd','pyBtn')">복사</button></div>
+      <div class="method-step" style="margin-top:8px"><span class="step-n">3</span><span class="step-txt">Chrome에서 열기</span></div>
+      <div class="cmd-row"><span class="cmd-text" id="urlCmd">http://localhost:8080/meeting-assistant.html</span><button class="copy-btn" id="urlBtn" onclick="copyCmd('urlCmd','urlBtn')">복사</button></div>
+    </div>
+    <button class="mbtn mbtn-close" onclick="document.getElementById('serverModal').classList.remove('show')">닫기 (DEMO 모드로 계속)</button>
+  </div>
+</div>
+
+<div class="panels">
+  <div class="panel">
+    <div class="ph">
+      <div class="ptitle"><div class="dot dot-b"></div>실시간 음성 인식</div>
+      <button class="pact" onclick="clearTranscript()">지우기</button>
+    </div>
+    <div class="pbody" id="tb">
+      <div class="hint">🎤 <strong style="color:var(--text)">▶ START</strong> 버튼을 누르고<br>말씀해주세요<br><br><span style="font-size:11px">질문 감지 → 우측 자동 답변 생성</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <div class="ptitle"><div class="dot dot-p"></div>AI Interview Assistant</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span id="aiCompanyBadge" style="font-size:10px;color:var(--accent4);background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.25);padding:2px 8px;border-radius:10px;font-weight:600">Lam Research</span>
+        <button class="pact" onclick="clearAI()">지우기</button>
+      </div>
+    </div>
+    <div class="pbody" id="aib">
+      <div class="hint">🤖 면접 질문이 감지되면<br>자동으로 Best Answer를 생성합니다<br><br><span style="font-size:11px;line-height:2.2;color:var(--border)">Topics: Why Apply · Vertex · CO-OM/PC<br>S/4HANA · Full Cycle · Requirements<br>Stakeholders · Behavioral · Technical</span></div>
+    </div>
+  </div>
+
+  <div class="panel panel-full qa">
+    <div class="ph">
+      <div class="ptitle"><div class="dot dot-a"></div>질의응답 (Q&amp;A)</div>
+      <span style="font-size:10px;color:var(--muted)">직접 질문 입력 · 인터뷰 & 회의 내용 기반</span>
+    </div>
+    <div class="qamsgs" id="qm">
+      <div class="hint">💬 아래에 직접 질문을 입력하세요</div>
+    </div>
+    <div class="qainput-row">
+      <input id="qi" placeholder="예: What is Universal Journal? / Vertex 질문 어떻게 답해? / CO-PC variance 분석 방법은?" disabled onkeydown="if(event.key==='Enter')ask()">
+      <button id="ab" onclick="ask()" disabled>질문하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLAUDE="https://api.anthropic.com/v1/messages";
+let rec=null,running=false,transcript="",pending="",interimEl=null;
+let demoOn=false,demoTimer=null;
+let API_KEY="",selectedCompany="lam";
+let questionBuffer="",qDetectTimer=null,lastAnsweredQ="";
+
+// ══════════════════════════════════════════════
+//  INTERVIEW CONTEXT — Lam Research
+// ══════════════════════════════════════════════
+const CTX_LAM = `
+=== CANDIDATE PROFILE ===
+Name: Junil Jeong | Title: SAP Director | Experience: 19 years SAP FICO
+Current: Coupang — overseeing 30+ legal entities across 10 countries
+Key Achievement: Contributed to Coupang NYSE listing (SOX, financial controls)
+Team Leadership: Since 2018, blended staff + contractors | Bilingual: Korean/English
+Scale: 50+ entity implementations, manufacturing + ecommerce industries
+Wife works in semiconductor industry — deep sector familiarity
+
+=== 4 STAR STORIES ===
+1. COST SAVINGS: Replaced 3 high-cost contractors with FTEs → reduced cost while improving quality, continuity, team satisfaction
+2. S/4HANA RESCUE: PMO vendor removed needed customizations → Junil's team documented everything using AI tools (compressed ~20hrs of custom program documentation dramatically), kept core settlement processing in-house, brought in new vendor for remaining scope, actively monitors upstream data format dependencies
+3. AI INNOVATION: Used AI to document 1,000+ complex custom programs for non-SAP team — ~20 hours compressed to a fraction
+4. SOX COMPLIANCE: Eliminated risky custom JE programs, restructured so upstream domains own calculations and send aggregate data via interfaces → fully auditable process, supported NYSE listing
+
+=== TOPIC 1: WHY APPLY / WHY MOVE ===
+Best answer: "Semiconductor is at the center of global tech growth and Lam Research is one of the most respected names in that space. I've spent years in manufacturing environments — Doosan, Yakult, now Coupang — and I understand the complexity that comes with large-scale manufacturing FICO. My wife works in the semiconductor industry, so I follow the trends closely. I want to bring my skills somewhere I can make a real impact during a critical growth phase."
+If asked why leaving Coupang: "I've accomplished what I set out to do — NYSE listing support, S/4HANA stabilization, building a strong team. I'm ready for the next challenge at a company where my manufacturing expertise is the core use case."
+
+=== TOPIC 2: VERTEX (EXTERNAL TAX ENGINE) ===
+Best answers:
+- Integration: "I've integrated Vertex with SAP through SD billing and MM purchasing tax determination. The key is mapping SAP tax codes to Vertex tax categories, and ensuring the Vertex address cleansing and jurisdiction logic is aligned with your GL account structure."
+- Challenges: "The biggest challenge is usually tax code mapping when you have legacy GL accounts that don't cleanly map to Vertex's categorization. I resolve this by running a full transaction audit in the test environment before go-live."
+- S/4HANA migration: "In S/4HANA, the tax engine integration points shift — you need to validate the Vertex connector version compatibility and re-test all SD/MM tax scenarios since the underlying table structures changed."
+- Discrepancy troubleshooting: "First check the tax determination log in SAP (transaction /VERTEX/LOGS). Compare the jurisdiction code Vertex returned against what SAP expected. Usually it's address data quality or a missing condition record."
+
+=== TOPIC 3: CO-OM & CO-PC ===
+CO-OM answers:
+- Internal order settlement: "Define settlement rules in KO02 — specify receiver (cost center, GL, WBS), distribution rules (percentages or amounts), and settlement profile. At period-end, run KO88 for actuals settlement."
+- Cost center hierarchy: "For global manufacturing, I recommend a 3-tier hierarchy: Company Code → Functional Area (Mfg, R&D, G&A) → Department. Keep it aligned with the profit center hierarchy for seamless reporting."
+CO-PC answers:
+- Variance analysis: "Run KKS1 at month-end. Check production order: compare target vs actual cost. Investigate: (1) Price variance — standard vs actual PO price, (2) Quantity variance — BOM vs actual consumption, (3) Activity variance — routing vs actual confirmed hours. Drill to FI document level."
+- Material Ledger / Actual Costing: "In S/4HANA, ML is mandatory. Actual costing closes the gap between standard and actual costs. At period-end, you run the actual cost run (CKMLCP) which revalues inventory at actual cost. Big change from ECC where you could run standard costing only."
+- BOM costing pitfalls: "Most common: missing activity prices for work centers, incomplete BOM where components aren't fully extended, and wrong base unit of measure causing rollup errors. Always validate with CS03 before running CK11N."
+
+=== TOPIC 4: S/4HANA TRANSFORMATIVE CHANGES ===
+Best answers:
+- Universal Journal: "Single source of truth — ACDOCA table unifies FI, CO, AA, and ML in one line item table. Eliminates the classic reconciliation pain between FI and CO. Real-time reporting without aggregation tables. This was the most impactful architectural change."
+- FI-CO merge: "Account-based CO-PA is now preferred because it posts directly to GL — audit-ready, no reconciliation needed. We redesigned all account assignment derivation logic and profit center substitutions."
+- New Asset Accounting: "Parallel valuation is now the standard — IFRS and local GAAP in the same asset run. Migration challenge was reconciling accumulated depreciation across ledgers. We built a detailed reconciliation workbook before cutover."
+- Real-time analytics: "CDS views and Fiori analytical apps replaced most BW extraction. Finance now gets real-time P&L instead of T+1 from BW. We eliminated 15+ custom reports by redirecting users to standard Fiori apps."
+- My experience: "At Coupang, the S/4HANA rescue required stabilizing all these new architectural elements under hypergrowth conditions — new business requirements every week while enforcing code freeze for migration integrity."
+
+=== TOPIC 5: FULL CYCLE PROJECT ===
+Best answer: "At Coupang, I led the S/4HANA stabilization as a rescue project. In the Explore phase I re-documented all existing customizations — using AI tools to compress what would have been 20 hours of work. In Realize, I kept core financial settlement in-house while bringing in a new vendor for peripheral scope. Testing — I ran a 3-tier strategy: unit test against design docs, SIT with cross-module integration (SD/MM/FI/CO), UAT with Finance business owners. Cutover was a 48-hour blackout window — we had a detailed run book with owner, timing, and rollback criteria for every step. Post go-live hypercare was 4 weeks with daily stand-up."
+Scope creep: "I use a formal change request process with a business priority score (revenue impact × urgency). During code freeze, everything goes to a backlog with a planned release date."
+If I could do one thing differently: "Start the upstream data format dependency monitoring earlier. We discovered mid-project that upstream systems were changing their output formats without notifying us. I now build a dependency registry on day one."
+
+=== TOPIC 6: REQUIREMENTS GATHERING ===
+Best answer: "I run a structured discovery process: (1) AS-IS process walkthrough with Finance SMEs, (2) Gap analysis against S/4HANA standard, (3) Requirement sign-off using a RICEF log with business owner approval. I use BPMN process flows for complex flows and a simple BRD template for functional specs. Traceability: every requirement maps to a config object and a test case."
+Conflicting requirements: "I escalate to the process owner, document both options with trade-offs, and get a signed decision. No informal verbal agreements — always in writing."
+Validate before UAT: "Desk check: walk the business owner through the configured system in a 'conference room pilot' before UAT starts. Catches 80% of misunderstandings early."
+
+=== TOPIC 7: FINANCE STAKEHOLDER MANAGEMENT ===
+Best answer: "I treat Finance stakeholders as partners, not just requirement sources. At Coupang I had weekly touchpoints with the CFO's team during the NYSE listing preparation — I translated SAP configuration decisions into financial risk language they could act on. The key is speaking their language: P&L impact, audit risk, control gaps — not SAP transaction codes."
+Difficult stakeholder: "During the SOX remediation, the Controller wanted to keep a custom JE program because it was 'efficient.' I showed them the audit risk — if that program ran incorrectly, it could misstate revenue by millions. We replaced it with a standard SAP interface with full audit trail. They became a champion of the new process."
+
+=== TOPIC 8: BEHAVIORAL / GENERAL ===
+Tell me about yourself: "19 years SAP FICO, 50+ entity implementations across manufacturing and ecommerce, 10 countries. Most recently led S/4HANA rescue and NYSE listing support at Coupang. I specialize in turning complex business problems into scalable SAP solutions — and I've done it under real pressure, from scratch, at global scale."
+Biggest challenge: "The S/4HANA rescue under Coupang's hypergrowth — daily new requirements while enforcing migration code freeze. I managed it with a formal change control process and transparent communication with leadership."
+Leadership style: "Outcome-focused, trust-based. I set clear expectations, give my team ownership, and remove blockers. I've led blended teams since 2018 — the key is consistent communication regardless of employment type."
+Weakness (honest): "Early in my career I moved too fast — delivering technically correct solutions without enough business context. Now I always start with the business problem before touching config."
+
+=== DELIVERY COACHING TIPS ===
+- Lead with OUTCOME first, then process: "We reduced month-end close by 2 days — here's how."
+- Speak slower on technical terms: ACDOCA, CO-PC, CKMLCP — let them land
+- Use pauses between thoughts — silence is okay
+- Shorter sentences — one idea per breath
+- End answers with: "Would you like me to go deeper on any part of that?"
+`;
+
+// ══════════════════════════════════════════════
+//  INTERVIEW CONTEXT — Pure Storage
+// ══════════════════════════════════════════════
+const CTX_PURE = `
+=== CANDIDATE PROFILE ===
+Name: Junil Jeong | SAP Director | 19 years FICO experience
+Current: Coupang — NYSE listing, SOX compliance, 30+ legal entities, 10 countries
+Strength for Pure Storage: Built financial infrastructure for a high-growth company that went from startup-speed to NYSE-listed
+
+=== 4 STAR STORIES (Pure Storage angle) ===
+1. COST SAVINGS: FTE vs contractor optimization — ROI-focused, sustainable team building
+2. S/4HANA RESCUE: Risk management under pressure, vendor management, business continuity
+3. AI INNOVATION: 20x documentation speed — relevant for a fast-moving tech company
+4. SOX COMPLIANCE: Built audit-ready processes from scratch → NYSE listing (directly relevant for Pure Storage's public company controls)
+
+=== TOPIC 1: WHY PURE STORAGE ===
+"Pure Storage is scaling globally as a cloud storage leader. I've built financial systems that had to grow from startup-speed to NYSE-listed in a short time — that's exactly the environment here. I know how to build scalable, clean SAP architecture that keeps pace with hypergrowth without accumulating technical debt."
+
+=== TOPIC 2: REVENUE RECOGNITION (IFRS 15 / ASC 606) ===
+"Deep experience with multi-element arrangements in SAP — separating hardware, software, and subscription service performance obligations. At Coupang we handled deferred revenue, point-in-time vs over-time recognition across 30+ entities. In SAP the key config is: Revenue Recognition type on item category, accrual method, and the interface to COPA for profitability analysis."
+SaaS/subscription angle: "For subscription revenue, I configure time-based revenue recognition in SD — each month the system posts the earned portion automatically. The challenge is aligning SAP periods with contract terms, especially for multi-year deals with escalators."
+
+=== TOPIC 3: SOX & INTERNAL CONTROLS ===
+"Led SOX remediation at Coupang in preparation for NYSE listing. Key work: (1) Eliminated custom JE programs that had no audit trail, (2) Restructured process ownership so upstream domains send aggregate data via standard interfaces, (3) Built a control matrix mapping each financial risk to a SAP config control. Result: clean external audit, successful listing."
+ITGCs: "SAP access controls — I implemented role-based authorization with SoD conflict resolution. Worked with internal audit to document all sensitive T-codes and restrict them to appropriate roles."
+
+=== TOPIC 4: MULTI-ENTITY / CONSOLIDATION ===
+"30+ legal entities across US, Korea, China, Europe. Key SAP config: company code structure aligned with legal reporting requirements, intercompany elimination using trading partner logic, currency translation using FAGL_FC_VAL. I built a month-end close checklist that standardized the process across all entities — reduced close time significantly."
+
+=== TOPIC 5: S/4HANA (same as Lam Research) ===
+Universal Journal, FI-CO merge, New Asset Accounting, Real-time analytics — same strong answers as Lam Research context.
+
+=== TOPIC 6-8: Full Cycle, Requirements, Stakeholders ===
+Same strong answers as Lam Research — emphasize NYSE listing and scale.
+
+=== WHY MOVE FROM COUPANG ===
+"I've accomplished what I set out to do — built the financial infrastructure that supported the NYSE listing, stabilized S/4HANA, built a strong team. I'm ready for the next chapter at a company where I can apply that experience to the next phase of growth."
+
+=== DELIVERY COACHING (same as Lam Research) ===
+Lead with outcome → explain process. Pause between thoughts. Shorter sentences. End with "Would you like me to go deeper?"
+`;
+
+const QUESTION_PATTERNS=[
+  /tell (me|us) about yourself/i,/walk me through your (background|experience|resume|career)/i,
+  /why (are you interested|lam|pure storage|this role|do you want|apply|move|leaving)/i,
+  /what is your.*(experience|background|expertise|strength)/i,
+  /how (did|do|would) you.*(handle|manage|approach|deal|resolve|address)/i,
+  /describe (a time|your|an example|how|the)/i,
+  /can you (tell|explain|describe|walk|give)/i,
+  /what (are|were|was) (your|the).*(challenge|result|impact|outcome|approach|biggest)/i,
+  /give me an example/i,/what do you know about/i,
+  /how (familiar|experienced) are you/i,
+  /what is (universal journal|s\/4|co-pa|co-pc|hana|acdoca|copa|copc|vertex|material ledger|actual costing)/i,
+  /explain (the|your|how|what)/i,
+  /(strength|weakness|accomplishment|achievement)/i,
+  /where do you see yourself/i,
+  /what (would|will) you (do|bring|contribute)/i,
+  /(vertex|tax engine)/i,
+  /(co-om|co-pc|product cost|internal order|cost center|settlement)/i,
+  /(data migration|cutover|go-live|blueprint|explore phase|realize)/i,
+  /(requirements gathering|business requirements|functional spec|BRD)/i,
+  /(stakeholder|finance team|controller|CFO|accounting)/i,
+  /(SOX|sox|internal control|audit|compliance|NYSE)/i,
+  /(revenue recognition|deferred revenue|ASC 606|IFRS 15)/i,
+  /(variance|KKS1|KO88|CK11N|CKMLCP|material ledger)/i,
+  /(full cycle|end.to.end|implementation|project (you|experience))/i,
+  /(leadership|team|manage people|hire|contractor)/i,
+  /(biggest challenge|difficult situation|conflict|failed|mistake)/i,
+  /why (move|leave|leaving|change)/i,
+  /(analytics|analysis).*(difference|explain|what is)/i,
+];
+
+// Topic classifier
+function classifyTopic(text){
+  if(/(vertex|tax engine)/i.test(text)) return 'Vertex';
+  if(/(co-pc|product cost|KKS1|CK11N|CKMLCP|material ledger|variance|BOM cost)/i.test(text)) return 'CO-PC';
+  if(/(co-om|internal order|cost center|KO88|settlement)/i.test(text)) return 'CO-OM';
+  if(/(universal journal|ACDOCA|s\/4hana|new asset|FI-CO|real.time analytic)/i.test(text)) return 'S/4HANA';
+  if(/(full cycle|end.to.end|go-live|cutover|blueprint|UAT|SIT)/i.test(text)) return 'Full Cycle';
+  if(/(requirements|BRD|functional spec|conference room pilot)/i.test(text)) return 'Requirements';
+  if(/(stakeholder|controller|CFO|finance team)/i.test(text)) return 'Stakeholders';
+  if(/(SOX|sox|audit|compliance|NYSE|internal control)/i.test(text)) return 'SOX';
+  if(/(revenue|ASC 606|IFRS 15|deferred|subscription)/i.test(text)) return 'Revenue Rec';
+  if(/(why.*lam|why.*pure|why.*role|why.*apply|why.*move|why.*leave)/i.test(text)) return 'Why Apply';
+  if(/(tell.*about yourself|walk.*background|career)/i.test(text)) return 'Intro';
+  if(/(challenge|difficult|failed|mistake|conflict)/i.test(text)) return 'Behavioral';
+  if(/(leadership|team|hire|manage people)/i.test(text)) return 'Leadership';
+  return 'General';
+}
+
+const DEMO_LINES=[
+  "Good morning Junil, can you tell me about yourself and your SAP experience?",
+  "Why are you interested in this role at Lam Research?",
+  "What is the Universal Journal in S/4HANA and why is it important?",
+  "Can you walk me through your experience with Vertex tax engine integration?",
+  "Describe a time you had to manage a difficult vendor relationship.",
+  "How do you handle CO-PC variance analysis at month-end?",
+  "Can you explain your experience with a full cycle S/4HANA implementation?",
+  "How do you gather and document business requirements from finance stakeholders?"
+];
+
+// ── Company select ──
+function setCompany(c){
+  selectedCompany=c;
+  document.getElementById('btnLam').classList.toggle('active',c==='lam');
+  document.getElementById('btnPure').classList.toggle('active',c==='pure');
+  document.getElementById('aiCompanyBadge').textContent=c==='lam'?'Lam Research':'Pure Storage';
+}
+
+// ── API Key ──
+function saveApiKey(){
+  const val=document.getElementById('apiKeyInput').value.trim();
+  const st=document.getElementById('apiSt');
+  if(!val){st.className='apibar-st err';st.textContent='키 입력 필요';return;}
+  if(!val.startsWith('sk-ant-')){st.className='apibar-st err';st.textContent='형식 오류';return;}
+  API_KEY=val;st.className='apibar-st ok';st.textContent='✅ 저장됨';
+  document.getElementById('apiKeyInput').value='sk-ant-...'+val.slice(-4);
+}
+document.getElementById('apiKeyInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
+
+async function callClaude(system,content,maxTokens=600){
+  if(!API_KEY)throw new Error('NO_KEY');
+  const r=await fetch(CLAUDE,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,system,messages:[{role:'user',content}]})
+  });
+  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||r.status);}
+  const d=await r.json();return d.content?.[0]?.text||'';
+}
+
+// ── Page load ──
+window.addEventListener('load',()=>{
+  if(location.protocol==='file:')document.getElementById('serverModal').classList.add('show');
+});
+function copyCmd(tid,bid){
+  const btn=document.getElementById(bid);
+  navigator.clipboard.writeText(document.getElementById(tid).textContent).then(()=>{
+    btn.textContent='✅';btn.classList.add('ok');setTimeout(()=>{btn.textContent='복사';btn.classList.remove('ok');},2000);
+  });
+}
+
+// ── Mic ──
+function toggleMic(){running?stopMic():startMic();}
+async function startMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){alert("Chrome 브라우저에서만 음성인식이 가능합니다.");return;}
+  if(location.protocol==='file:'){document.getElementById('serverModal').classList.add('show');return;}
+  try{const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});s.getTracks().forEach(t=>t.stop());}
+  catch(e){alert("마이크 권한이 필요합니다.\n주소창 🔒 → 마이크 → 허용 후 새로고침");return;}
+  stopDemo();running=true;
+  setStatus('live','🔴 녹음 중');
+  document.getElementById('startBtn').textContent='■ STOP';
+  document.getElementById('startBtn').className='btn btn-stop';
+  enableQA();clearHint('tb');
+  rec=new (window.SpeechRecognition||window.webkitSpeechRecognition)();
+  rec.continuous=true;rec.interimResults=true;rec.lang=document.getElementById('langSel').value;
+  rec.onresult=(e)=>{
+    let fin='',interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      e.results[i].isFinal?(fin+=t+' '):(interim+=t);
+    }
+    if(fin){transcript+=fin;appendFinal(fin);scheduleQDetect(fin);}
+    showInterim(interim);
+  };
+  rec.onerror=(e)=>{if(e.error!=='no-speech')console.warn('SR:',e.error);};
+  rec.onend=()=>{if(running)rec.start();};
+  rec.start();
+}
+function stopMic(){
+  running=false;if(rec){rec.stop();rec=null;}
+  setStatus('idle','대기 중');
+  document.getElementById('startBtn').textContent='▶ START';
+  document.getElementById('startBtn').className='btn btn-start';
+  if(interimEl){interimEl.remove();interimEl=null;}
+}
+
+// ── Question detection ──
+function scheduleQDetect(text){
+  questionBuffer+=text;
+  if(qDetectTimer)clearTimeout(qDetectTimer);
+  qDetectTimer=setTimeout(()=>{
+    const q=questionBuffer.trim();questionBuffer='';
+    if(isQuestion(q))handleQuestion(q);
+  },1800);
+}
+function isQuestion(t){return t.endsWith('?')||QUESTION_PATTERNS.some(p=>p.test(t));}
+
+async function handleQuestion(questionText){
+  if(questionText===lastAnsweredQ||questionText.trim().length<15)return;
+  lastAnsweredQ=questionText;
+  const displayQ=questionText.length>130?'...'+questionText.slice(-130):questionText;
+  const topic=classifyTopic(questionText);
+  const company=selectedCompany==='lam'?'Lam Research':'Pure Storage';
+  const body=document.getElementById('aib');
+  clearHint('aib');
+  const card=document.createElement('div');card.className='ai-card';
+  card.innerHTML=`
+    <div class="ai-card-head">
+      <div class="ai-card-q">❓ ${esc(displayQ)}</div>
+      <div class="ai-card-tags">
+        <span class="ai-tag topic">${topic}</span>
+        <span class="ai-tag">${company}</span>
+      </div>
+    </div>
+    <div class="ai-card-body">
+      <div class="ai-card-ans"><div class="thinking"><span></span><span></span><span></span></div></div>
+    </div>`;
+  body.appendChild(card);body.scrollTop=body.scrollHeight;
+  if(!API_KEY){
+    card.querySelector('.ai-card-ans').innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단에 API Key를 입력해주세요</span>';return;
+  }
+  const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
+  try{
+    const result=await callClaude(
+      `You are an expert SAP interview coach providing real-time answer guidance.
+
+${ctx}
+
+RESPONSE FORMAT:
+1. Best spoken answer (3-5 sentences, natural conversational English, NO bullet points)
+2. One delivery tip (brief, practical)
+
+Keep it concise — the candidate needs to speak in seconds, not minutes.
+Do NOT include headers or labels — just the answer, then a line break, then "💡 Tip: [delivery tip]"`,
+      `Interview question: "${questionText}"\n\nProvide the best spoken answer for Junil.`,400);
+    const parts=result.split(/💡 Tip:/i);
+    const ansHTML=esc(parts[0].trim());
+    const tipHTML=parts[1]?`<div class="ai-tip"><strong>💡 Tip:</strong> ${esc(parts[1].trim())}</div>`:'';
+    card.querySelector('.ai-card-ans').innerHTML=ansHTML.replace(/\n/g,'<br>')+tipHTML;
+  }catch(e){
+    const msg=e.message==='NO_KEY'?'🔑 API Key를 입력해주세요':`오류: ${e.message}`;
+    card.querySelector('.ai-card-ans').innerHTML=`<span style="color:var(--danger);font-size:12px">${msg}</span>`;
+  }
+  body.scrollTop=body.scrollHeight;
+}
+
+// ── DEMO ──
+function toggleDemo(){demoOn?stopDemo():startDemo();}
+async function startDemo(){
+  stopMic();demoOn=true;setStatus('demo','DEMO 중');
+  document.getElementById('demoBtn').textContent='⏹ 중지';
+  enableQA();clearHint('tb');clearHint('aib');
+  transcript='';questionBuffer='';
+  let i=0;
+  async function next(){
+    if(!demoOn||i>=DEMO_LINES.length){stopDemo();return;}
+    const s=DEMO_LINES[i++];await typeText(s);transcript+=s+' ';
+    if(isQuestion(s))await handleQuestion(s);
+    demoTimer=setTimeout(next,1400);
+  }
+  next();
+}
+function stopDemo(){
+  demoOn=false;clearTimeout(demoTimer);
+  document.getElementById('demoBtn').textContent='🧪 DEMO';
+  if(!running)setStatus('idle','대기 중');
+}
+
+// ── Typing / SR output ──
+async function typeText(text){
+  return new Promise(resolve=>{
+    const body=document.getElementById('tb');
+    const node=document.createElement('span');node.className='ttext';
+    const cur=document.createElement('span');cur.className='cursor';
+    body.appendChild(node);body.appendChild(cur);
+    let idx=0;
+    const iv=setInterval(()=>{
+      if(idx<text.length){node.textContent+=text[idx++];body.scrollTop=body.scrollHeight;}
+      else{node.textContent+='\n';cur.remove();clearInterval(iv);resolve();}
+    },32);
+  });
+}
+function appendFinal(text){
+  const body=document.getElementById('tb');
+  if(interimEl){interimEl.remove();interimEl=null;}
+  const n=document.createElement('span');n.className='ttext';n.textContent=text;
+  body.appendChild(n);body.scrollTop=body.scrollHeight;
+}
+function showInterim(text){
+  const body=document.getElementById('tb');
+  if(!text){if(interimEl)interimEl.textContent='';return;}
+  if(!interimEl){interimEl=document.createElement('span');interimEl.className='ttext interim';body.appendChild(interimEl);}
+  interimEl.textContent=text;body.scrollTop=body.scrollHeight;
+}
+
+// ── Q&A ──
+async function ask(){
+  const inp=document.getElementById('qi');const q=inp.value.trim();if(!q)return;inp.value='';
+  const msgs=document.getElementById('qm');msgs.querySelector('.hint')?.remove();
+  const u=document.createElement('div');u.className='msg u';u.textContent=q;msgs.appendChild(u);
+  const a=document.createElement('div');a.className='msg a';
+  a.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
+  msgs.appendChild(a);msgs.scrollTop=msgs.scrollHeight;
+  if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단에 API Key를 입력해주세요</span>';return;}
+  const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
+  const meetingCtx=transcript.slice(-2000)||'(없음)';
+  try{
+    const result=await callClaude(
+      `You are an SAP interview coach and meeting assistant for Junil Jeong.\n\n${ctx}\n\nRECENT MEETING/INTERVIEW TRANSCRIPT:\n"""\n${meetingCtx}\n"""\n\nAnswer in Korean unless the question is in English. Be concise and practical.`,
+      q,700);
+    a.textContent=result;
+  }catch(e){a.innerHTML=`<span style="color:var(--danger);font-size:12px">오류: ${e.message}</span>`;}
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+// ── Utils ──
+function setStatus(cls,label){const b=document.getElementById('badge');b.className='badge '+cls;b.textContent=label;}
+function enableQA(){document.getElementById('qi').disabled=false;document.getElementById('ab').disabled=false;}
+function clearHint(id){document.getElementById(id).querySelector('.hint')?.remove();}
+function clearTranscript(){transcript='';interimEl=null;questionBuffer='';document.getElementById('tb').innerHTML='<div class="hint">🎤 <strong style="color:var(--text)">▶ START</strong> 버튼을 누르고 말씀해주세요</div>';}
+function clearAI(){document.getElementById('aib').innerHTML='<div class="hint">🤖 면접 질문이 감지되면 자동으로 Best Answer를 생성합니다</div>';lastAnsweredQ='';}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
