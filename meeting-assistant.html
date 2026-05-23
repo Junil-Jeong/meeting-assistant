@@ -388,8 +388,11 @@ function saveApiKey(){
   const st=document.getElementById('apiSt');
   if(!val){st.className='apibar-st err';st.textContent='키 입력 필요';return;}
   if(!val.startsWith('sk-ant-')){st.className='apibar-st err';st.textContent='형식 오류';return;}
-  API_KEY=val;st.className='apibar-st ok';st.textContent='✅ 저장됨';
+  API_KEY=val;
+  st.className='apibar-st ok';
+  st.textContent='✅ 저장됨 — AI 답변 활성화';
   document.getElementById('apiKeyInput').value='sk-ant-...'+val.slice(-4);
+  enableQA();
 }
 document.getElementById('apiKeyInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
 
