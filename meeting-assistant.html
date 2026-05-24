@@ -177,6 +177,17 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
       <div class="ptitle"><div class="dot dot-b"></div>실시간 음성 인식</div>
       <button class="pact" onclick="clearTranscript()">지우기</button>
     </div>
+    <!-- 마이크 볼륨 바 -->
+    <div id="volBar" style="display:none;padding:8px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap">🎤 마이크</span>
+        <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+          <div id="volFill" style="height:100%;width:0%;background:#34d399;border-radius:3px;transition:width .08s ease"></div>
+        </div>
+        <span id="volLabel" style="font-size:10px;color:var(--muted);min-width:28px;text-align:right">0%</span>
+        <span id="srStateLabel" style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(107,122,153,.15);color:var(--muted);white-space:nowrap">대기 중</span>
+      </div>
+    </div>
     <div class="pbody" id="tb">
       <div class="hint">🎤 START 눌러 마이크 시작<br>또는 DEMO로 미리보기</div>
     </div>
@@ -560,6 +571,8 @@ function toggleMic(){
     stopMic();
   } else {
     startMic();
+  } else {
+    startMic();
   }
 }
 async function startMic(){
@@ -595,9 +608,13 @@ async function startMic(){
   rec.onstart=()=>{
     hideMicError();
     setSRStatus('말하면 인식 시작됩니다...');
+    const stLbl=document.getElementById('srStateLabel');
+    if(stLbl){stLbl.textContent='🟢 녹음 중';stLbl.style.background='rgba(52,211,153,.15)';stLbl.style.color='#34d399';}
   };
   rec.onresult=(e)=>{
     setSRStatus('✅ 인식 중...');
+    const stLbl2=document.getElementById('srStateLabel');
+    if(stLbl2){stLbl2.textContent='✅ 인식 중';stLbl2.style.background='rgba(79,142,247,.15)';stLbl2.style.color='#4f8ef7';}
     let fin='',interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       const t=e.results[i][0].transcript;
