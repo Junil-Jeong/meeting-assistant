@@ -17,9 +17,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 .logo{font-size:14px;font-weight:700;white-space:nowrap}.logo em{color:var(--accent);font-style:normal}
 .logo sub{font-size:10px;color:var(--muted);font-weight:400;margin-left:5px}
 .topbar-mid{display:flex;align-items:center;gap:8px;flex:1;justify-content:center}
-.company-btn{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .18s}
-.company-btn.active{background:var(--accent4);color:#0d0f12;border-color:var(--accent4)}
-.company-btn:hover:not(.active){border-color:var(--accent4);color:var(--accent4)}
 .btns{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .badge{font-size:11px;padding:3px 9px;border-radius:4px;font-weight:600}
 .badge.idle{background:#1e2433;color:var(--muted);border:1px solid var(--border)}
@@ -126,9 +123,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 <div class="topbar">
   <div class="logo"><em>Meeting</em> Assistant<sub>Interview AI</sub></div>
   <div class="topbar-mid">
-    <span style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em">Company:</span>
-    <button class="company-btn active" id="btnLam" onclick="setCompany('lam')">Lam Research</button>
-    <button class="company-btn" id="btnPure" onclick="setCompany('pure')">Pure Storage</button>
   </div>
   <div class="btns">
     <select class="lang-sel" id="langSel"><option value="en-US">🇺🇸 English</option><option value="ko-KR">🇰🇷 한국어</option></select>
@@ -208,7 +202,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
     <div class="ph">
       <div class="ptitle"><div class="dot dot-p"></div>AI Interview Assistant</div>
       <div style="display:flex;align-items:center;gap:5px">
-        <span id="aiCompanyBadge" style="font-size:9px;color:var(--accent4);background:rgba(192,132,252,.1);border:0.5px solid rgba(192,132,252,.25);padding:2px 7px;border-radius:8px;font-weight:600">Lam Research</span>
+        <span style="font-size:9px;color:var(--accent4);background:rgba(192,132,252,.1);border:0.5px solid rgba(192,132,252,.25);padding:2px 7px;border-radius:8px;font-weight:600">Lam Research · Pure Storage</span>
         <button class="pact" onclick="clearAI()">지우기</button>
       </div>
     </div>
@@ -316,13 +310,13 @@ window.addEventListener('load',()=>{
 const CLAUDE="https://api.anthropic.com/v1/messages";
 let rec=null,running=false,transcript="",pending="",interimEl=null;
 let demoOn=false,demoTimer=null;
-let API_KEY="",selectedCompany="lam";
+let API_KEY="";
 let questionBuffer="",qDetectTimer=null,lastAnsweredQ="";
 
 // ══════════════════════════════════════════════
 //  INTERVIEW CONTEXT — Lam Research
 // ══════════════════════════════════════════════
-const CTX_LAM = `
+const CTX_COMBINED = `
 === CANDIDATE PROFILE ===
 Name: Junil Jeong | Title: SAP Director | Experience: 19 years SAP FICO
 Current: Coupang — overseeing 30+ legal entities across 10 countries
@@ -391,12 +385,10 @@ Weakness (honest): "Early in my career I moved too fast — delivering technical
 - Use pauses between thoughts — silence is okay
 - Shorter sentences — one idea per breath
 - End answers with: "Would you like me to go deeper on any part of that?"
-`;
 
-// ══════════════════════════════════════════════
-//  INTERVIEW CONTEXT — Pure Storage
-// ══════════════════════════════════════════════
-const CTX_PURE = `
+════════════════════════════════
+PURE STORAGE SPECIFIC CONTEXT
+════════════════════════════════
 === CANDIDATE PROFILE ===
 Name: Junil Jeong | SAP Director | 19 years FICO experience
 Current: Coupang — NYSE listing, SOX compliance, 30+ legal entities, 10 countries
@@ -495,12 +487,6 @@ const DEMO_LINES=[
 ];
 
 // ── Company select ──
-function setCompany(c){
-  selectedCompany=c;
-  document.getElementById('btnLam').classList.toggle('active',c==='lam');
-  document.getElementById('btnPure').classList.toggle('active',c==='pure');
-  document.getElementById('aiCompanyBadge').textContent=c==='lam'?'Lam Research':'Pure Storage';
-}
 
 // ── API Key ──
 function autoSaveKey(val){
@@ -679,7 +665,7 @@ async function handleQuestion(questionText){
   lastAnsweredQ=questionText;
   const displayQ=questionText.length>130?'...'+questionText.slice(-130):questionText;
   const topic=classifyTopic(questionText);
-  const company=selectedCompany==='lam'?'Lam Research':'Pure Storage';
+  const company='Lam Research & Pure Storage';
 
   // ── Q&A 패널에 질문 표시 ──
   const qaPanel=document.getElementById('qm');
@@ -715,7 +701,7 @@ async function handleQuestion(questionText){
     return;
   }
 
-  const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
+  const ctx=CTX_COMBINED;
   callClaude(
     buildInterviewPrompt(ctx, questionText),
     `Interview question: "${questionText}"\n\nProvide the best spoken answer for Junil. Check notepad for relevant prepared content first.`,
@@ -802,7 +788,7 @@ async function ask(){
   a.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
   msgs.appendChild(a);msgs.scrollTop=msgs.scrollHeight;
   if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단 API Key 입력창에 키를 입력 후 저장 버튼을 눌러주세요.</span>';return;}
-  const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
+  const ctx=CTX_COMBINED;
   const meetingCtx=transcript.slice(-2000)||'(없음)';
     const noteCtx=getNoteContent().slice(-3000)||'(없음)';
   try{
