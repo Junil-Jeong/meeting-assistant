@@ -39,7 +39,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 .apibar-st.ok{color:var(--accent2)}.apibar-st.err{color:var(--danger)}
 .apibar-link{font-size:11px;color:var(--muted);text-decoration:none;white-space:nowrap}
 .apibar-link:hover{color:var(--accent3);text-decoration:underline}
-.panels{flex:1;display:grid;grid-template-rows:1fr 1fr 0.85fr;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);overflow:hidden}
+.panels{flex:1;display:grid;grid-template-rows:1fr 1fr 0.85fr;grid-template-columns:1fr 1fr 44px;gap:1px;background:var(--border);overflow:hidden}
 .panel{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .panel-full{grid-column:1/-1}
 .ph{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -116,6 +116,38 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 .ntbtn.pri{background:rgba(167,139,250,.12);color:#a78bfa;border-color:rgba(167,139,250,.3)}
 .saved-tag{font-size:10px;color:var(--accent2);margin-left:auto;opacity:0;transition:opacity .3s}
 .saved-tag.show{opacity:1}
+
+/* ── 세로 볼륨 바 패널 ── */
+.vol-panel{
+  background:var(--bg2);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-end;
+  padding:10px 0 8px;gap:5px;
+  grid-row:3;grid-column:3;
+}
+.vol-track{
+  width:10px;flex:1;max-height:140px;
+  background:var(--bg3);
+  border-radius:5px;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:flex-end;
+}
+#volFill{
+  width:100%;height:0%;
+  background:#34d399;border-radius:5px;
+  transition:height .08s ease;
+}
+#volLabel{font-size:9px;color:var(--muted);font-weight:600;}
+#srStateLabel{
+  font-size:8px;font-weight:600;color:var(--muted);
+  writing-mode:vertical-rl;text-orientation:mixed;
+  letter-spacing:.06em;opacity:.7;
+}
+.mic-pulse{
+  font-size:13px;
+  animation:none;
+}
+.mic-pulse.active{animation:mpulse 1s infinite;}
+@keyframes mpulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
 </head>
 <body>
@@ -177,17 +209,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
       <div class="ptitle"><div class="dot dot-b"></div>실시간 음성 인식</div>
       <button class="pact" onclick="clearTranscript()">지우기</button>
     </div>
-    <!-- 마이크 볼륨 바 -->
-    <div id="volBar" style="display:none;padding:8px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border);flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:10px;color:var(--muted);white-space:nowrap">🎤 마이크</span>
-        <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
-          <div id="volFill" style="height:100%;width:0%;background:#34d399;border-radius:3px;transition:width .08s ease"></div>
-        </div>
-        <span id="volLabel" style="font-size:10px;color:var(--muted);min-width:28px;text-align:right">0%</span>
-        <span id="srStateLabel" style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(107,122,153,.15);color:var(--muted);white-space:nowrap">대기 중</span>
-      </div>
-    </div>
+
     <div class="pbody" id="tb">
       <div class="hint">🎤 START 눌러 마이크 시작<br>또는 DEMO로 미리보기</div>
     </div>
@@ -223,7 +245,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
   </div>
 
   <!-- 하단 전체: 메모장 -->
-  <div class="panel panel-full notepad">
+  <div class="panel notepad" style="grid-column:span 2">
     <div class="ph">
       <div class="ptitle"><div class="dot" style="background:#a78bfa"></div>메모장 (Notepad)</div>
       <div style="display:flex;align-items:center;gap:5px">
@@ -242,91 +264,24 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
     </div>
   </div>
 
+
+  <!-- 세로 볼륨 바 (우측 하단) -->
+  <div class="vol-panel" id="micVolPanel">
+    <span class="mic-pulse" id="micIcon">🎤</span>
+    <div class="vol-track">
+      <div id="volFill"></div>
+    </div>
+    <span id="volLabel">-</span>
+    <span id="srStateLabel">대기</span>
+  </div>
+
 </div>
 
 <script>
 
-// ── 메모장 ──
+// == 상수 ==
+const CLAUDE = "https://api.anthropic.com/v1/messages";
 const NOTE_KEY = 'meeting_asst_notes';
-
-function loadNote(){
-  try { const s=localStorage.getItem(NOTE_KEY); if(s) document.getElementById('noteArea').value=s; } catch(e){}
-}
-function saveNote(){
-  try {
-    localStorage.setItem(NOTE_KEY, document.getElementById('noteArea').value);
-    const t=document.getElementById('savedTag');
-    if(t){ t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
-  } catch(e){}
-}
-function appendToNote(label, content){
-  const area=document.getElementById('noteArea');
-  if(!area||!content||!content.trim()) return;
-  const now=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
-  area.value += (area.value?'\n':'')+'['+label+' '+now+']\n'+content.trim()+'\n';
-  area.scrollTop=area.scrollHeight;
-  saveNote();
-}
-function getNoteContent(){ try{ return document.getElementById('noteArea').value||''; }catch(e){ return ''; } }
-function clearNote(){ if(!confirm('메모장을 모두 지울까요?')) return; document.getElementById('noteArea').value=''; saveNote(); }
-function copyNote(){
-  const v=document.getElementById('noteArea').value;
-  if(!v){alert('메모장이 비어있어요.');return;}
-  navigator.clipboard.writeText(v).then(()=>{
-    const b=event.target; b.textContent='✅ 복사됨'; setTimeout(()=>b.textContent='📋 전체 복사',2000);
-  });
-}
-function handleFileUpload(input){
-  const files = Array.from(input.files);
-  if(!files.length) return;
-  let loaded = 0;
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target.result;
-      appendToNote('업로드['+file.name+']', content);
-      loaded++;
-      if(loaded === files.length){
-        const btn = document.querySelector('[onclick*="fileUpload"]');
-        if(btn){ btn.textContent='✅ '+loaded+'개 업로드됨'; setTimeout(()=>btn.textContent='📂 TXT 업로드',2500); }
-      }
-    };
-    reader.onerror = () => {
-      appendToNote('업로드오류', file.name+' 파일을 읽을 수 없습니다.');
-    };
-    reader.readAsText(file, 'UTF-8');
-  });
-  // input 초기화 (같은 파일 다시 업로드 가능하게)
-  input.value = '';
-}
-
-function exportNote(){
-  const v=document.getElementById('noteArea').value;
-  if(!v){alert('메모장이 비어있어요.');return;}
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([v],{type:'text/plain;charset=utf-8'}));
-  a.download='meeting-notes-'+new Date().toISOString().slice(0,10)+'.txt';
-  a.click();
-}
-function addManualNote(){
-  const t=prompt('메모 내용을 입력하세요:');
-  if(t&&t.trim()) appendToNote('메모',t.trim());
-}
-window.addEventListener('load',()=>{
-  loadNote();
-  const area=document.getElementById('noteArea');
-  if(area){ let st=null; area.addEventListener('input',()=>{ clearTimeout(st); st=setTimeout(saveNote,800); }); }
-});
-
-const CLAUDE="https://api.anthropic.com/v1/messages";
-let rec=null,running=false,transcript="",pending="",interimEl=null;
-let demoOn=false,demoTimer=null;
-let API_KEY="";
-let questionBuffer="",qDetectTimer=null,lastAnsweredQ="";
-
-// ══════════════════════════════════════════════
-//  INTERVIEW CONTEXT — Lam Research
-// ══════════════════════════════════════════════
 const CTX_COMBINED = `
 === CANDIDATE PROFILE ===
 Name: Junil Jeong | Title: SAP Director | Experience: 19 years SAP FICO
@@ -468,363 +423,377 @@ const QUESTION_PATTERNS=[
   /(analytics|analysis).*(difference|explain|what is)/i,
 ];
 
-// Topic classifier
-function classifyTopic(text){
-  if(/(vertex|tax engine)/i.test(text)) return 'Vertex';
-  if(/(co-pc|product cost|KKS1|CK11N|CKMLCP|material ledger|variance|BOM cost)/i.test(text)) return 'CO-PC';
-  if(/(co-om|internal order|cost center|KO88|settlement)/i.test(text)) return 'CO-OM';
-  if(/(universal journal|ACDOCA|s4hana|new asset|FI.CO|real.time analytic)/i.test(text)) return 'S/4HANA';
-  if(/(full cycle|end.to.end|go-live|cutover|blueprint|UAT|SIT)/i.test(text)) return 'Full Cycle';
-  if(/(requirements|BRD|functional spec|conference room pilot)/i.test(text)) return 'Requirements';
-  if(/(stakeholder|controller|CFO|finance team)/i.test(text)) return 'Stakeholders';
-  if(/(SOX|sox|audit|compliance|NYSE|internal control)/i.test(text)) return 'SOX';
-  if(/(revenue|ASC 606|IFRS 15|deferred|subscription)/i.test(text)) return 'Revenue Rec';
-  if(/(why.*lam|why.*pure|why.*role|why.*apply|why.*move|why.*leave)/i.test(text)) return 'Why Apply';
-  if(/(tell.*about yourself|walk.*background|career)/i.test(text)) return 'Intro';
-  if(/(challenge|difficult|failed|mistake|conflict)/i.test(text)) return 'Behavioral';
-  if(/(leadership|team|hire|manage people)/i.test(text)) return 'Leadership';
-  return 'General';
+// == 상태 변수 ==
+let rec=null, running=false, transcript="", interimEl=null;
+let demoOn=false, demoTimer=null, API_KEY="";
+let qBuf="", qTimer=null, lastQ="";
+let audioCtx=null, analyser=null, meterStream=null, meterTimer=null;
+
+// == 메모장 ==
+function loadNote(){
+  try{ const s=localStorage.getItem(NOTE_KEY); if(s) document.getElementById('noteArea').value=s; }catch(e){}
+}
+function saveNote(){
+  try{
+    localStorage.setItem(NOTE_KEY, document.getElementById('noteArea').value);
+    const t=document.getElementById('savedTag');
+    if(t){ t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
+  }catch(e){}
+}
+function appendToNote(label, content){
+  const area=document.getElementById('noteArea');
+  if(!area||!content||!content.trim()) return;
+  const now=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  area.value+=(area.value?'\n':'')+'['+label+' '+now+']\n'+content.trim()+'\n';
+  area.scrollTop=area.scrollHeight; saveNote();
+}
+function getNoteContent(){ try{ return document.getElementById('noteArea')?.value||''; }catch(e){ return ''; } }
+function clearNote(){ if(!confirm('메모장을 모두 지울까요?')) return; document.getElementById('noteArea').value=''; saveNote(); }
+function copyNote(){
+  const v=document.getElementById('noteArea').value;
+  if(!v){alert('메모장이 비어있어요.');return;}
+  navigator.clipboard.writeText(v).then(()=>{ const b=event.target; b.textContent='복사됨'; setTimeout(()=>b.textContent='전체 복사',2000); });
+}
+function exportNote(){
+  const v=document.getElementById('noteArea').value;
+  if(!v){alert('메모장이 비어있어요.');return;}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([v],{type:'text/plain;charset=utf-8'}));
+  a.download='meeting-notes-'+new Date().toISOString().slice(0,10)+'.txt'; a.click();
+}
+function addManualNote(){
+  const t=prompt('메모 내용을 입력하세요:');
+  if(t&&t.trim()) appendToNote('메모',t.trim());
+}
+function handleFileUpload(input){
+  Array.from(input.files).forEach(file=>{
+    const r=new FileReader();
+    r.onload=e=>appendToNote('업로드['+file.name+']', e.target.result);
+    r.readAsText(file,'UTF-8');
+  });
+  input.value='';
 }
 
-const DEMO_LINES=[
-  "Good morning Junil, can you tell me about yourself and your SAP experience?",
-  "Why are you interested in this role at Lam Research?",
-  "What is the Universal Journal in S/4HANA and why is it important?",
-  "Can you walk me through your experience with Vertex tax engine integration?",
-  "Describe a time you had to manage a difficult vendor relationship.",
-  "How do you handle CO-PC variance analysis at month-end?",
-  "Can you explain your experience with a full cycle S/4HANA implementation?",
-  "How do you gather and document business requirements from finance stakeholders?"
-];
-
-// ── Company select ──
-
-// ── API Key ──
+// == API Key ==
 function autoSaveKey(val){
   val=val.trim();
-  if(val.length >= 20 && (val.startsWith('sk-') || val.startsWith('sk-ant-'))){
+  if(val.length>=20){
     API_KEY=val;
     const st=document.getElementById('apiSt');
-    st.className='apibar-st ok';
-    st.textContent='✅ 저장됨';
+    st.className='apibar-st ok'; st.textContent='저장됨';
     enableQA();
   }
 }
 function saveApiKey(){
   const val=document.getElementById('apiKeyInput').value.trim();
   const st=document.getElementById('apiSt');
-  if(!val){st.className='apibar-st err';st.textContent='키를 입력하세요';return;}
-  if(val.length < 20){st.className='apibar-st err';st.textContent='키가 너무 짧습니다';return;}
-  API_KEY=val;
-  st.className='apibar-st ok';
-  st.textContent='✅ 저장됨';
+  if(!val||val.length<20){ st.className='apibar-st err'; st.textContent='형식 오류'; return; }
+  API_KEY=val; st.className='apibar-st ok'; st.textContent='저장됨';
   document.getElementById('apiKeyInput').value=val.substring(0,12)+'...'+val.slice(-4);
   enableQA();
-  console.log('API Key saved, length:', val.length);
 }
-document.getElementById('apiKeyInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
+document.getElementById('apiKeyInput').addEventListener('keydown',e=>{ if(e.key==='Enter') saveApiKey(); });
 
-function buildInterviewPrompt(ctx, question){
-  const notes = getNoteContent().trim();
-  const hasNotes = notes.length > 20;
-  let prompt = 'You are an expert SAP interview coach providing real-time answer guidance.\n\n';
-  prompt += ctx + '\n\n';
+// == Claude API ==
+function buildInterviewPrompt(){
+  const notes=getNoteContent().trim();
+  const hasNotes=notes.length>20;
+  let p='You are an expert SAP interview coach providing real-time answer guidance.\n\n';
+  p+=CTX_COMBINED+'\n\n';
   if(hasNotes){
-    const noteSnippet = notes.slice(-4000);
-    prompt += 'NOTEPAD (uploaded materials & saved notes — scan for relevant info):\n';
-    prompt += '"""\n' + noteSnippet + '\n"""\n\n';
-    prompt += 'PRIORITY: Check the notepad first. If relevant content exists, use it in your answer.\n\n';
+    p+='NOTEPAD (scan for relevant info):\n---\n'+notes.slice(-4000)+'\n---\n\n';
+    p+='PRIORITY: Check notepad first. Use relevant content in answer.\n\n';
   }
-  prompt += 'RESPONSE FORMAT:\n';
-  prompt += '- Best spoken answer (3-5 sentences, natural English, NO bullet points)\n';
-  if(hasNotes) prompt += '- If notepad had relevant info, add: "📋 Notes: [brief reference]"\n';
-  prompt += '- End with: "💡 Tip: [one practical delivery tip]"\n\n';
-  prompt += 'Keep it concise and conversational.';
-  return prompt;
+  p+='RESPONSE: Best spoken answer (3-5 sentences, natural English, no bullets).';
+  p+=' End with "Tip: [delivery tip]"';
+  return p;
 }
-
-async function callClaude(system,content,maxTokens=600){
-  if(!API_KEY)throw new Error('NO_KEY');
+async function callClaude(system, content, maxTokens){
+  maxTokens=maxTokens||600;
+  if(!API_KEY) throw new Error('NO_KEY');
   const r=await fetch(CLAUDE,{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,system,messages:[{role:'user',content}]})
+    headers:{'Content-Type':'application/json','x-api-key':API_KEY,
+      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,system:system,messages:[{role:'user',content:content}]})
   });
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||r.status);}
-  const d=await r.json();return d.content?.[0]?.text||'';
+  if(!r.ok){const e=await r.json(); throw new Error(e.error?.message||r.status);}
+  return (await r.json()).content?.[0]?.text||'';
 }
 
-// ── Page load ──
+// == 페이지 로드 ==
 window.addEventListener('load',()=>{
-  if(location.protocol==='file:')document.getElementById('serverModal').classList.add('show');
+  loadNote();
+  const area=document.getElementById('noteArea');
+  if(area){ let st=null; area.addEventListener('input',()=>{ clearTimeout(st); st=setTimeout(saveNote,800); }); }
+  if(location.protocol==='file:') document.getElementById('serverModal').classList.add('show');
 });
 function copyCmd(tid,bid){
   const btn=document.getElementById(bid);
   navigator.clipboard.writeText(document.getElementById(tid).textContent).then(()=>{
-    btn.textContent='✅';btn.classList.add('ok');setTimeout(()=>{btn.textContent='복사';btn.classList.remove('ok');},2000);
+    btn.textContent='완료'; setTimeout(()=>btn.textContent='복사',2000);
   });
 }
 
-// ── Mic ──
+// == 오디오 미터 ==
+async function startAudioMeter(){
+  const micIcon=document.getElementById('micIcon');
+  if(micIcon) micIcon.classList.add('active');
+  try{
+    meterStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=128; analyser.smoothingTimeConstant=0.7;
+    audioCtx.createMediaStreamSource(meterStream).connect(analyser);
+    const data=new Uint8Array(analyser.frequencyBinCount);
+    meterTimer=setInterval(()=>{
+      analyser.getByteFrequencyData(data);
+      const avg=data.slice(2,40).reduce((a,b)=>a+b,0)/38;
+      const pct=Math.min(Math.round(avg/128*100),100);
+      const fill=document.getElementById('volFill');
+      const lbl=document.getElementById('volLabel');
+      if(fill){ fill.style.height=pct+'%'; fill.style.background=pct>70?'#f87171':pct>35?'#f59e0b':'#34d399'; }
+      if(lbl) lbl.textContent=pct+'%';
+    },80);
+  }catch(e){ console.warn('meter error:',e); }
+}
+function stopAudioMeter(){
+  const micIcon=document.getElementById('micIcon');
+  if(micIcon) micIcon.classList.remove('active');
+  if(meterTimer){ clearInterval(meterTimer); meterTimer=null; }
+  if(meterStream){ meterStream.getTracks().forEach(t=>t.stop()); meterStream=null; }
+  if(audioCtx){ try{ audioCtx.close(); }catch(e){} audioCtx=null; }
+  const fill=document.getElementById('volFill'); if(fill) fill.style.width='0%';
+  const lbl=document.getElementById('volLabel'); if(lbl) lbl.textContent='0%';
+  setSRStatus('대기 중','rgba(107,122,153,.15)','var(--muted)');
+}
+function setSRStatus(msg,bg,fg){
+  const el=document.getElementById('srStateLabel');
+  if(!el) return;
+  el.textContent=msg;
+  if(bg) el.style.background=bg;
+  if(fg) el.style.color=fg;
+}
+
+// == 마이크 ==
 function toggleMic(){
-  if(running || rec){
-    stopMic();
-  } else {
-    startMic();
-  } else {
-    startMic();
-  }
+  if(running||rec){ stopMic(); } else { startMic(); }
 }
 async function startMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showMicError('Chrome 브라우저가 필요합니다.'); return; }
   if(location.protocol==='file:'){ document.getElementById('serverModal').classList.add('show'); return; }
   hideMicError();
-
-  // getUserMedia로 먼저 권한 확인
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    stream.getTracks().forEach(t=>t.stop());
-  } catch(err) {
-    showMicError('⛔ 마이크 접근 거부 ('+err.name+')<br>'+
-      '① 주소창 왼쪽 🔒 클릭 → 마이크 → <b>허용</b><br>'+
-      '② <b>F5 새로고침</b> 후 다시 START<br>'+
-      '<button onclick="location.reload()" style="margin-top:6px;padding:4px 12px;background:#4f8ef7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit">🔃 지금 새로고침</button>');
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    s.getTracks().forEach(t=>t.stop());
+  }catch(err){
+    showMicError('마이크 접근 거부 ('+err.name+') — 주소창 자물쇠 클릭 → 마이크 → 허용 → F5 새로고침');
     return;
   }
-
-  stopDemo();running=true;
-  setStatus('live','🔴 녹음 중');
-  document.getElementById('startBtn').textContent='■ STOP';
+  stopDemo(); running=true;
+  setStatus('live','녹음 중');
+  document.getElementById('startBtn').textContent='STOP';
   document.getElementById('startBtn').className='btn btn-stop';
-  enableQA();clearHint('tb');
-
-  // 오디오 레벨 미터 시작
+  enableQA(); clearHint('tb');
   startAudioMeter();
-
   rec=new SR();
-  rec.continuous=true;rec.interimResults=true;
+  rec.continuous=true; rec.interimResults=true;
   rec.lang=document.getElementById('langSel').value;
-  rec.onstart=()=>{
-    hideMicError();
-    setSRStatus('말하면 인식 시작됩니다...');
-    const stLbl=document.getElementById('srStateLabel');
-    if(stLbl){stLbl.textContent='🟢 녹음 중';stLbl.style.background='rgba(52,211,153,.15)';stLbl.style.color='#34d399';}
-  };
+  rec.onstart=()=>{ hideMicError(); setSRStatus('녹음 중','rgba(52,211,153,.15)','#34d399'); };
   rec.onresult=(e)=>{
-    setSRStatus('✅ 인식 중...');
-    const stLbl2=document.getElementById('srStateLabel');
-    if(stLbl2){stLbl2.textContent='✅ 인식 중';stLbl2.style.background='rgba(79,142,247,.15)';stLbl2.style.color='#4f8ef7';}
+    setSRStatus('인식 중','rgba(79,142,247,.15)','#4f8ef7');
     let fin='',interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       const t=e.results[i][0].transcript;
       e.results[i].isFinal?(fin+=t+' '):(interim+=t);
     }
-    if(fin){transcript+=fin;appendFinal(fin);scheduleQDetect(fin);}
+    if(fin){ transcript+=fin; appendFinal(fin); scheduleQDetect(fin); }
     showInterim(interim);
   };
   rec.onerror=(e)=>{
-    console.warn('SR error:',e.error);
-    if(e.error==='not-allowed'){
-      stopMic();
-      showMicError('⛔ 음성인식 권한 오류<br>주소창 🔒 → 마이크 → <b>허용</b> 변경 후<br>'+
-        '<button onclick="location.reload()" style="margin-top:6px;padding:4px 12px;background:#4f8ef7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit">🔃 페이지 새로고침</button>');
-    } else if(e.error==='no-speech'){
-      // 정상
-    } else if(e.error==='audio-capture'){
-      stopMic();showMicError('⛔ 마이크를 찾을 수 없습니다.');
-    } else if(e.error==='network'){
-      stopMic();showMicError('⛔ 네트워크 오류 — 다시 START를 눌러주세요.');
-    } else {
-      showMicError('⚠️ 오류: '+e.error);
-    }
+    if(e.error==='no-speech') return;
+    stopMic();
+    if(e.error==='not-allowed') showMicError('마이크 권한 오류 — 주소창 자물쇠 → 마이크 → 허용 → F5 새로고침');
+    else if(e.error==='audio-capture') showMicError('마이크를 찾을 수 없습니다.');
+    else if(e.error==='network') showMicError('네트워크 오류 — 다시 START를 눌러주세요.');
+    else showMicError('오류: '+e.error);
   };
-  rec.onend=()=>{if(running) rec.start();};
+  rec.onend=()=>{ if(running) rec.start(); };
   rec.start();
+}
+function stopMic(){
+  running=false;
+  if(rec){ try{ rec.onend=null; rec.stop(); }catch(e){} rec=null; }
+  if(qTimer){ clearTimeout(qTimer); qTimer=null; }
+  stopAudioMeter();
+  setStatus('idle','대기 중');
+  const btn=document.getElementById('startBtn');
+  if(btn){ btn.textContent='START'; btn.className='btn btn-start'; }
+  if(interimEl){ try{ interimEl.remove(); }catch(e){} interimEl=null; }
 }
 function showMicError(msg){
   const el=document.getElementById('micStatus');
-  if(!el){ console.warn('micError:', msg); return; }
-  el.innerHTML=msg;
-  el.style.display='block';
+  if(el){ el.textContent=msg; el.style.display='block'; }
 }
 function hideMicError(){
   const el=document.getElementById('micStatus');
   if(el) el.style.display='none';
 }
-function stopMic(){
-  running=false;
-  if(rec){
-    try{ rec.onend=null; rec.stop(); }catch(e){}
-    rec=null;
-  }
-  if(qDetectTimer){clearTimeout(qDetectTimer);qDetectTimer=null;}
-  stopAudioMeter();
-  setStatus('idle','대기 중');
-  const btn=document.getElementById('startBtn');
-  if(btn){btn.textContent='▶ START';btn.className='btn btn-start';}
-  if(interimEl){try{interimEl.remove();}catch(e){} interimEl=null;}
-}
 
-// ── Question detection ──
+// == 질문 감지 ==
 function scheduleQDetect(text){
-  questionBuffer+=text;
-  if(qDetectTimer)clearTimeout(qDetectTimer);
-  qDetectTimer=setTimeout(()=>{
-    const q=questionBuffer.trim();questionBuffer='';
-    if(isQuestion(q))handleQuestion(q);
+  qBuf+=text;
+  if(qTimer) clearTimeout(qTimer);
+  qTimer=setTimeout(()=>{
+    const q=qBuf.trim(); qBuf='';
+    if(q.length>12&&(q.endsWith('?')||QUESTION_PATTERNS.some(p=>p.test(q)))) handleQuestion(q);
   },1800);
 }
-function isQuestion(t){return t.endsWith('?')||QUESTION_PATTERNS.some(p=>p.test(t));}
+function classifyTopic(t){
+  if(/(vertex|tax engine)/i.test(t)) return 'Vertex';
+  if(/(co-pc|product cost|KKS1|variance)/i.test(t)) return 'CO-PC';
+  if(/(co-om|internal order|cost center)/i.test(t)) return 'CO-OM';
+  if(/(universal journal|ACDOCA|s4hana|new asset)/i.test(t)) return 'S/4HANA';
+  if(/(full cycle|go-live|cutover|UAT)/i.test(t)) return 'Full Cycle';
+  if(/(requirements|BRD)/i.test(t)) return 'Requirements';
+  if(/(stakeholder|controller|CFO)/i.test(t)) return 'Stakeholders';
+  if(/(SOX|audit|compliance|NYSE)/i.test(t)) return 'SOX';
+  if(/(why.*lam|why.*pure|why.*role|why.*apply)/i.test(t)) return 'Why Apply';
+  if(/(tell.*about yourself|walk.*background)/i.test(t)) return 'Intro';
+  if(/(challenge|difficult|failed)/i.test(t)) return 'Behavioral';
+  return 'General';
+}
+function handleQuestion(qText){
+  if(qText===lastQ||qText.trim().length<15) return;
+  lastQ=qText;
+  const displayQ=qText.length>130?'...'+qText.slice(-130):qText;
+  const topic=classifyTopic(qText);
 
-async function handleQuestion(questionText){
-  if(questionText===lastAnsweredQ||questionText.trim().length<15) return;
-  lastAnsweredQ=questionText;
-  const displayQ=questionText.length>130?'...'+questionText.slice(-130):questionText;
-  const topic=classifyTopic(questionText);
-  const company='Lam Research & Pure Storage';
-
-  // ── Q&A 패널에 질문 표시 ──
+  // Q&A 패널
   const qaPanel=document.getElementById('qm');
   qaPanel.querySelector('.hint')?.remove();
-  const qBubble=document.createElement('div');
-  qBubble.className='msg u';
-  qBubble.innerHTML='<span style="font-size:9px;opacity:.6;display:block;margin-bottom:3px">🎤 미팅 중 감지된 질문</span>'+esc(displayQ);
+  const qBubble=document.createElement('div'); qBubble.className='msg u';
+  qBubble.innerHTML='<span style="font-size:9px;opacity:.6;display:block;margin-bottom:3px">감지된 질문</span>'+esc(displayQ);
   qaPanel.appendChild(qBubble);
-  const aBubble=document.createElement('div');
-  aBubble.className='msg a';
+  const aBubble=document.createElement('div'); aBubble.className='msg a';
   aBubble.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
-  qaPanel.appendChild(aBubble);
-  qaPanel.scrollTop=qaPanel.scrollHeight;
+  qaPanel.appendChild(aBubble); qaPanel.scrollTop=qaPanel.scrollHeight;
 
-  // ── AI Interview Assistant 카드 ──
+  // AI Interview 패널
   const aiBody=document.getElementById('aib');
   aiBody.querySelector('.hint')?.remove();
-  const card=document.createElement('div');card.className='ai-card';
-  card.innerHTML=`
-    <div class="ai-card-head">
-      <div class="ai-card-q">❓ ${esc(displayQ)}</div>
-      <div class="ai-tags"><span class="ai-tag topic">${topic}</span><span class="ai-tag">${company}</span></div>
-    </div>
-    <div class="ai-card-body">
-      <div class="ai-card-ans"><div class="thinking"><span></span><span></span><span></span></div></div>
-    </div>`;
-  aiBody.appendChild(card);aiBody.scrollTop=aiBody.scrollHeight;
+  const card=document.createElement('div'); card.className='ai-card';
+  card.innerHTML='<div class="ai-card-head"><div class="ai-card-q">'+esc(displayQ)+'</div><div class="ai-tags"><span class="ai-tag topic">'+topic+'</span></div></div><div class="ai-card-body"><div class="ai-card-ans"><div class="thinking"><span></span><span></span><span></span></div></div></div>';
+  aiBody.appendChild(card); aiBody.scrollTop=aiBody.scrollHeight;
 
   if(!API_KEY){
-    const noKey='<span style="color:var(--accent3);font-size:12px">🔑 API Key를 입력해주세요</span>';
-    card.querySelector('.ai-card-ans').innerHTML=noKey;
-    aBubble.innerHTML=noKey;
-    return;
+    const msg='<span style="color:var(--accent3);font-size:12px">API Key를 입력해주세요</span>';
+    card.querySelector('.ai-card-ans').innerHTML=msg; aBubble.innerHTML=msg; return;
   }
-
-  const ctx=CTX_COMBINED;
-  callClaude(
-    buildInterviewPrompt(ctx, questionText),
-    `Interview question: "${questionText}"\n\nProvide the best spoken answer for Junil. Check notepad for relevant prepared content first.`,
-    550
+  callClaude(buildInterviewPrompt(),
+    'Interview question: "'+qText+'"\n\nBest spoken answer for Junil. Check notepad for relevant content.',500
   ).then(result=>{
-    // AI Interview 카드 업데이트
-    const parts=result.split(/💡 Tip:/i);
-    const ansText=parts[0].trim();
-    const tipHTML=parts[1]?`<div class="ai-tip"><strong>💡 Tip:</strong> ${esc(parts[1].trim())}</div>`:'';
-    card.querySelector('.ai-card-ans').innerHTML=esc(ansText).replace(/
-/g,'<br>')+tipHTML;
-    aiBody.scrollTop=aiBody.scrollHeight;
-
-    // Q&A 패널 답변 업데이트
+    const tipIdx=result.search(/Tip:/i);
+    const ansText=tipIdx>0?result.slice(0,tipIdx).trim():result.trim();
+    const tipText=tipIdx>0?result.slice(tipIdx+4).trim():'';
+    const tipHTML=tipText?'<div class="ai-tip"><strong>Tip:</strong> '+esc(tipText)+'</div>':'';
+    card.querySelector('.ai-card-ans').innerHTML=esc(ansText).replace(/\n/g,'<br>')+tipHTML;
     aBubble.textContent=ansText;
-    qaPanel.scrollTop=qaPanel.scrollHeight;
-
-    // 메모장 저장
-    appendToNote('AI답변['+topic+']','Q: '+questionText+'
-A: '+ansText);
+    aiBody.scrollTop=aiBody.scrollHeight; qaPanel.scrollTop=qaPanel.scrollHeight;
+    appendToNote('AI답변['+topic+']','Q: '+qText+'\nA: '+ansText);
   }).catch(e=>{
-    const errMsg=e.message==='NO_KEY'?'🔑 API Key를 입력해주세요':'오류: '+e.message;
-    card.querySelector('.ai-card-ans').innerHTML=`<span style="color:var(--danger);font-size:12px">${errMsg}</span>`;
-    aBubble.innerHTML=`<span style="color:var(--danger);font-size:12px">${errMsg}</span>`;
+    const msg='<span style="color:var(--danger);font-size:12px">'+(e.message==='NO_KEY'?'API Key 필요':'오류: '+e.message)+'</span>';
+    card.querySelector('.ai-card-ans').innerHTML=msg; aBubble.innerHTML=msg;
   });
 }
 
-// ── DEMO ──
-function toggleDemo(){demoOn?stopDemo():startDemo();}
+// == DEMO ==
+const DEMO_Q=[
+  "Good morning Junil, can you tell me about yourself and your SAP background?",
+  "Why are you interested in Lam Research specifically?",
+  "What is the Universal Journal in S/4HANA?",
+  "Walk me through your Vertex tax engine experience.",
+  "How do you handle CO-PC variance analysis at month end?",
+  "Describe a full cycle S/4HANA implementation you led.",
+  "How do you gather requirements from finance stakeholders?",
+  "Tell me about your SOX compliance work at Coupang."
+];
+function toggleDemo(){ demoOn?stopDemo():startDemo(); }
 async function startDemo(){
-  stopMic();demoOn=true;setStatus('demo','DEMO 중');
-  document.getElementById('demoBtn').textContent='⏹ 중지';
-  enableQA();clearHint('tb');clearHint('aib');
-  transcript='';questionBuffer='';
+  stopMic(); demoOn=true; setStatus('demo','DEMO 중');
+  document.getElementById('demoBtn').textContent='STOP';
+  enableQA(); clearHint('tb'); clearHint('aib');
+  transcript=''; qBuf='';
   let i=0;
   async function next(){
-    if(!demoOn||i>=DEMO_LINES.length){stopDemo();return;}
-    const s=DEMO_LINES[i++];await typeText(s);transcript+=s+' ';
-    if(isQuestion(s))await handleQuestion(s);
-    demoTimer=setTimeout(next,1400);
+    if(!demoOn||i>=DEMO_Q.length){ stopDemo(); return; }
+    const s=DEMO_Q[i++]; await typeText(s); transcript+=s+' ';
+    handleQuestion(s); demoTimer=setTimeout(next,1400);
   }
   next();
 }
 function stopDemo(){
-  demoOn=false;clearTimeout(demoTimer);
-  document.getElementById('demoBtn').textContent='🧪 DEMO';
-  if(!running)setStatus('idle','대기 중');
+  demoOn=false; clearTimeout(demoTimer);
+  document.getElementById('demoBtn').textContent='DEMO';
+  if(!running) setStatus('idle','대기 중');
 }
 
-// ── Typing / SR output ──
+// == 타이핑 출력 ==
 async function typeText(text){
   return new Promise(resolve=>{
     const body=document.getElementById('tb');
-    const node=document.createElement('span');node.className='ttext';
-    const cur=document.createElement('span');cur.className='cursor';
-    body.appendChild(node);body.appendChild(cur);
+    const node=document.createElement('span'); node.className='ttext';
+    const cur=document.createElement('span'); cur.className='cursor';
+    body.appendChild(node); body.appendChild(cur);
     let idx=0;
     const iv=setInterval(()=>{
-      if(idx<text.length){node.textContent+=text[idx++];body.scrollTop=body.scrollHeight;}
-      else{node.textContent+='\n';cur.remove();clearInterval(iv);resolve();}
+      if(idx<text.length){ node.textContent+=text[idx++]; body.scrollTop=body.scrollHeight; }
+      else{ node.textContent+='\n'; cur.remove(); clearInterval(iv); resolve(); }
     },32);
   });
 }
 function appendFinal(text){
   const body=document.getElementById('tb');
-  if(interimEl){interimEl.remove();interimEl=null;}
-  const n=document.createElement('span');n.className='ttext';n.textContent=text;
-  body.appendChild(n);body.scrollTop=body.scrollHeight;
+  if(interimEl){ interimEl.remove(); interimEl=null; }
+  const n=document.createElement('span'); n.className='ttext'; n.textContent=text;
+  body.appendChild(n); body.scrollTop=body.scrollHeight;
   appendToNote('음성인식',text.trim());
 }
 function showInterim(text){
   const body=document.getElementById('tb');
-  if(!text){if(interimEl)interimEl.textContent='';return;}
-  if(!interimEl){interimEl=document.createElement('span');interimEl.className='ttext interim';body.appendChild(interimEl);}
-  interimEl.textContent=text;body.scrollTop=body.scrollHeight;
+  if(!text){ if(interimEl) interimEl.textContent=''; return; }
+  if(!interimEl){ interimEl=document.createElement('span'); interimEl.className='ttext interim'; body.appendChild(interimEl); }
+  interimEl.textContent=text; body.scrollTop=body.scrollHeight;
 }
 
-// ── Q&A ──
+// == Q&A ==
 async function ask(){
-  const inp=document.getElementById('qi');const q=inp.value.trim();if(!q)return;inp.value='';
-  const msgs=document.getElementById('qm');msgs.querySelector('.hint')?.remove();
-  const u=document.createElement('div');u.className='msg u';u.textContent=q;msgs.appendChild(u);
-  const a=document.createElement('div');a.className='msg a';
+  const inp=document.getElementById('qi'); const q=inp.value.trim(); if(!q) return; inp.value='';
+  const msgs=document.getElementById('qm'); msgs.querySelector('.hint')?.remove();
+  const u=document.createElement('div'); u.className='msg u'; u.textContent=q; msgs.appendChild(u);
+  const a=document.createElement('div'); a.className='msg a';
   a.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
-  msgs.appendChild(a);msgs.scrollTop=msgs.scrollHeight;
-  if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단 API Key 입력창에 키를 입력 후 저장 버튼을 눌러주세요.</span>';return;}
-  const ctx=CTX_COMBINED;
-  const meetingCtx=transcript.slice(-2000)||'(없음)';
-    const noteCtx=getNoteContent().slice(-3000)||'(없음)';
+  msgs.appendChild(a); msgs.scrollTop=msgs.scrollHeight;
+  if(!API_KEY){ a.innerHTML='<span style="color:var(--accent3);font-size:12px">API Key를 입력해주세요</span>'; return; }
   try{
     const result=await callClaude(
-      `You are an SAP interview coach and meeting assistant for Junil Jeong.\n\n${ctx}\n\nRECENT MEETING/INTERVIEW TRANSCRIPT:\n"""\n${meetingCtx}\n"""\n\nNOTEPAD (저장된 메모):\n"""\n${noteCtx}\n"""\n\nAnswer in Korean unless the question is in English. Be concise and practical.`,
+      CTX_COMBINED+'\n\nMEETING:\n"""\n'+transcript.slice(-2000)+'\n"""\n\nNOTEPAD:\n"""\n'+getNoteContent().slice(-3000)+'\n"""\n\nAnswer in Korean unless asked in English.',
       q,700);
     a.textContent=result;
     appendToNote('Q&A','Q: '+q+'\nA: '+result);
-  }catch(e){a.innerHTML=`<span style="color:var(--danger);font-size:12px">오류: ${e.message}</span>`;}
+  }catch(e){ a.innerHTML='<span style="color:var(--danger);font-size:12px">오류: '+e.message+'</span>'; }
   msgs.scrollTop=msgs.scrollHeight;
 }
 
-// ── Utils ──
-function setStatus(cls,label){const b=document.getElementById('badge');b.className='badge '+cls;b.textContent=label;}
-function enableQA(){document.getElementById('qi').disabled=false;document.getElementById('ab').disabled=false;}
-function clearHint(id){document.getElementById(id).querySelector('.hint')?.remove();}
-function clearTranscript(){transcript='';interimEl=null;questionBuffer='';document.getElementById('tb').innerHTML='<div class="hint">🎤 <strong style="color:var(--text)">▶ START</strong> 버튼을 누르고 말씀해주세요</div>';}
-function clearAI(){document.getElementById('aib').innerHTML='<div class="hint">🤖 면접 질문이 감지되면 자동으로 Best Answer를 생성합니다</div>';lastAnsweredQ='';}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// == 유틸 ==
+function setStatus(cls,label){ const b=document.getElementById('badge'); b.className='badge '+cls; b.textContent=label; }
+function enableQA(){ document.getElementById('qi').disabled=false; document.getElementById('ab').disabled=false; }
+function clearHint(id){ document.getElementById(id)?.querySelector('.hint')?.remove(); }
+function clearTranscript(){ transcript=''; interimEl=null; document.getElementById('tb').innerHTML='<div class="hint">START 눌러 마이크 시작</div>'; }
+function clearAI(){ document.getElementById('aib').innerHTML='<div class="hint">질문 감지 시 자동 답변 생성</div>'; lastQ=''; }
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 </script>
 </body>
 </html>
