@@ -42,7 +42,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 .apibar-st.ok{color:var(--accent2)}.apibar-st.err{color:var(--danger)}
 .apibar-link{font-size:11px;color:var(--muted);text-decoration:none;white-space:nowrap}
 .apibar-link:hover{color:var(--accent3);text-decoration:underline}
-.panels{flex:1;display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);overflow:hidden}
+.panels{flex:1;display:grid;grid-template-rows:1fr 1fr 0.85fr;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);overflow:hidden}
 .panel{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .panel-full{grid-column:1/-1}
 .ph{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -108,6 +108,17 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 .copy-btn.ok{color:var(--accent2);border-color:rgba(52,211,153,.4)}
 .mbtn{width:100%;padding:11px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;font-family:inherit;margin-top:8px}
 .mbtn-close{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}.mbtn-close:hover{background:var(--border);color:var(--text)}
+
+/* ── 메모장 ── */
+.notepad{display:flex;flex-direction:column;min-height:0}
+#noteArea{flex:1;background:var(--bg3);border:none;resize:none;padding:10px 12px;color:var(--text);font-size:12px;font-family:'Courier New',monospace;line-height:1.7;outline:none;width:100%}
+#noteArea::placeholder{color:var(--muted);font-family:'Segoe UI',sans-serif}
+.note-toolbar{display:flex;gap:6px;padding:6px 12px;background:var(--bg2);border-top:0.5px solid var(--border);flex-shrink:0;align-items:center}
+.ntbtn{padding:3px 10px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;border:0.5px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .15s}
+.ntbtn:hover{background:var(--bg3);color:var(--text)}
+.ntbtn.pri{background:rgba(167,139,250,.12);color:#a78bfa;border-color:rgba(167,139,250,.3)}
+.saved-tag{font-size:10px;color:var(--accent2);margin-left:auto;opacity:0;transition:opacity .3s}
+.saved-tag.show{opacity:1}
 </style>
 </head>
 <body>
@@ -165,45 +176,143 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;di
 
 <div id="micStatus" style="display:none;padding:8px 20px;background:rgba(248,113,113,.1);border-bottom:0.5px solid rgba(248,113,113,.25);color:#f87171;font-size:12px;line-height:1.6;flex-shrink:0"></div>
 <div class="panels">
-  <div class="panel">
+
+  <!-- 좌: 실시간 음성 인식 (2행 span) -->
+  <div class="panel" style="grid-row:span 2">
     <div class="ph">
       <div class="ptitle"><div class="dot dot-b"></div>실시간 음성 인식</div>
       <button class="pact" onclick="clearTranscript()">지우기</button>
     </div>
     <div class="pbody" id="tb">
-      <div class="hint">🎤 <strong style="color:var(--text)">▶ START</strong> 버튼을 누르고<br>말씀해주세요<br><br><span style="font-size:11px">질문 감지 → 우측 자동 답변 생성</span></div>
+      <div class="hint">🎤 START 눌러 마이크 시작<br>또는 DEMO로 미리보기</div>
     </div>
   </div>
 
+  <!-- 우상단: Q&A -->
+  <div class="panel qa">
+    <div class="ph">
+      <div class="ptitle"><div class="dot dot-a"></div>질의응답 Q&amp;A</div>
+      <span style="font-size:9px;color:var(--muted)">미팅 질문 자동 감지 + 직접 입력</span>
+    </div>
+    <div class="qamsgs" id="qm">
+      <div class="hint">💬 미팅 중 감지된 질문과<br>직접 입력한 질문이 여기 표시됩니다</div>
+    </div>
+    <div class="qainput-row">
+      <input id="qi" placeholder="직접 질문 입력... (예: What is Universal Journal?)" disabled onkeydown="if(event.key==='Enter')ask()">
+      <button id="ab" onclick="ask()" disabled>질문하기</button>
+    </div>
+  </div>
+
+  <!-- 우하단: AI Interview Assistant -->
   <div class="panel">
     <div class="ph">
       <div class="ptitle"><div class="dot dot-p"></div>AI Interview Assistant</div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span id="aiCompanyBadge" style="font-size:10px;color:var(--accent4);background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.25);padding:2px 8px;border-radius:10px;font-weight:600">Lam Research</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span id="aiCompanyBadge" style="font-size:9px;color:var(--accent4);background:rgba(192,132,252,.1);border:0.5px solid rgba(192,132,252,.25);padding:2px 7px;border-radius:8px;font-weight:600">Lam Research</span>
         <button class="pact" onclick="clearAI()">지우기</button>
       </div>
     </div>
     <div class="pbody" id="aib">
-      <div class="hint">🤖 면접 질문이 감지되면<br>자동으로 Best Answer를 생성합니다<br><br><span style="font-size:11px;line-height:2.2;color:var(--border)">Topics: Why Apply · Vertex · CO-OM/PC<br>S/4HANA · Full Cycle · Requirements<br>Stakeholders · Behavioral · Technical</span></div>
+      <div class="hint">🤖 질문 감지 시 Best Answer 자동 생성<br><span style="font-size:10px">Lam/Pure Storage 인터뷰 컨텍스트 기반</span></div>
     </div>
   </div>
 
-  <div class="panel panel-full qa">
+  <!-- 하단 전체: 메모장 -->
+  <div class="panel panel-full notepad">
     <div class="ph">
-      <div class="ptitle"><div class="dot dot-a"></div>질의응답 (Q&amp;A)</div>
-      <span style="font-size:10px;color:var(--muted)">직접 질문 입력 · 인터뷰 & 회의 내용 기반</span>
+      <div class="ptitle"><div class="dot" style="background:#a78bfa"></div>메모장 (Notepad)</div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:9px;color:#a78bfa;background:rgba(167,139,250,.1);border:0.5px solid rgba(167,139,250,.25);padding:2px 7px;border-radius:8px;font-weight:600">자동 저장</span>
+        <button class="pact" onclick="clearNote()">지우기</button>
+      </div>
     </div>
-    <div class="qamsgs" id="qm">
-      <div class="hint">💬 아래에 직접 질문을 입력하세요</div>
-    </div>
-    <div class="qainput-row">
-      <input id="qi" placeholder="예: What is Universal Journal? / Vertex 질문 어떻게 답해? / CO-PC variance 분석 방법은?" disabled onkeydown="if(event.key==='Enter')ask()">
-      <button id="ab" onclick="ask()" disabled>질문하기</button>
+    <textarea id="noteArea" placeholder="면접 질문/AI 답변/Q&A 내용이 자동으로 저장됩니다&#10;직접 메모를 추가할 수도 있어요"></textarea>
+    <div class="note-toolbar">
+      <button class="ntbtn pri" onclick="copyNote()">📋 전체 복사</button>
+      <button class="ntbtn" onclick="exportNote()">💾 TXT 저장</button>
+      <button class="ntbtn" onclick="document.getElementById('fileUpload').click()">📂 TXT 업로드</button>
+      <button class="ntbtn" onclick="addManualNote()">✏️ 직접 메모</button>
+      <input type="file" id="fileUpload" accept=".txt,.md,.text" style="display:none" multiple onchange="handleFileUpload(this)">
+      <span class="saved-tag" id="savedTag">저장됨 ✓</span>
     </div>
   </div>
+
 </div>
 
 <script>
+
+// ── 메모장 ──
+const NOTE_KEY = 'meeting_asst_notes';
+
+function loadNote(){
+  try { const s=localStorage.getItem(NOTE_KEY); if(s) document.getElementById('noteArea').value=s; } catch(e){}
+}
+function saveNote(){
+  try {
+    localStorage.setItem(NOTE_KEY, document.getElementById('noteArea').value);
+    const t=document.getElementById('savedTag');
+    if(t){ t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
+  } catch(e){}
+}
+function appendToNote(label, content){
+  const area=document.getElementById('noteArea');
+  if(!area||!content||!content.trim()) return;
+  const now=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  area.value += (area.value?'\n':'')+'['+label+' '+now+']\n'+content.trim()+'\n';
+  area.scrollTop=area.scrollHeight;
+  saveNote();
+}
+function getNoteContent(){ try{ return document.getElementById('noteArea').value||''; }catch(e){ return ''; } }
+function clearNote(){ if(!confirm('메모장을 모두 지울까요?')) return; document.getElementById('noteArea').value=''; saveNote(); }
+function copyNote(){
+  const v=document.getElementById('noteArea').value;
+  if(!v){alert('메모장이 비어있어요.');return;}
+  navigator.clipboard.writeText(v).then(()=>{
+    const b=event.target; b.textContent='✅ 복사됨'; setTimeout(()=>b.textContent='📋 전체 복사',2000);
+  });
+}
+function handleFileUpload(input){
+  const files = Array.from(input.files);
+  if(!files.length) return;
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      appendToNote('업로드['+file.name+']', content);
+      loaded++;
+      if(loaded === files.length){
+        const btn = document.querySelector('[onclick*="fileUpload"]');
+        if(btn){ btn.textContent='✅ '+loaded+'개 업로드됨'; setTimeout(()=>btn.textContent='📂 TXT 업로드',2500); }
+      }
+    };
+    reader.onerror = () => {
+      appendToNote('업로드오류', file.name+' 파일을 읽을 수 없습니다.');
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+  // input 초기화 (같은 파일 다시 업로드 가능하게)
+  input.value = '';
+}
+
+function exportNote(){
+  const v=document.getElementById('noteArea').value;
+  if(!v){alert('메모장이 비어있어요.');return;}
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([v],{type:'text/plain;charset=utf-8'}));
+  a.download='meeting-notes-'+new Date().toISOString().slice(0,10)+'.txt';
+  a.click();
+}
+function addManualNote(){
+  const t=prompt('메모 내용을 입력하세요:');
+  if(t&&t.trim()) appendToNote('메모',t.trim());
+}
+window.addEventListener('load',()=>{
+  loadNote();
+  const area=document.getElementById('noteArea');
+  if(area){ let st=null; area.addEventListener('input',()=>{ clearTimeout(st); st=setTimeout(saveNote,800); }); }
+});
+
 const CLAUDE="https://api.anthropic.com/v1/messages";
 let rec=null,running=false,transcript="",pending="",interimEl=null;
 let demoOn=false,demoTimer=null;
@@ -418,6 +527,25 @@ function saveApiKey(){
 }
 document.getElementById('apiKeyInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
 
+function buildInterviewPrompt(ctx, question){
+  const notes = getNoteContent().trim();
+  const hasNotes = notes.length > 20;
+  let prompt = 'You are an expert SAP interview coach providing real-time answer guidance.\n\n';
+  prompt += ctx + '\n\n';
+  if(hasNotes){
+    const noteSnippet = notes.slice(-4000);
+    prompt += 'NOTEPAD (uploaded materials & saved notes — scan for relevant info):\n';
+    prompt += '"""\n' + noteSnippet + '\n"""\n\n';
+    prompt += 'PRIORITY: Check the notepad first. If relevant content exists, use it in your answer.\n\n';
+  }
+  prompt += 'RESPONSE FORMAT:\n';
+  prompt += '- Best spoken answer (3-5 sentences, natural English, NO bullet points)\n';
+  if(hasNotes) prompt += '- If notepad had relevant info, add: "📋 Notes: [brief reference]"\n';
+  prompt += '- End with: "💡 Tip: [one practical delivery tip]"\n\n';
+  prompt += 'Keep it concise and conversational.';
+  return prompt;
+}
+
 async function callClaude(system,content,maxTokens=600){
   if(!API_KEY)throw new Error('NO_KEY');
   const r=await fetch(CLAUDE,{
@@ -536,52 +664,72 @@ function scheduleQDetect(text){
 function isQuestion(t){return t.endsWith('?')||QUESTION_PATTERNS.some(p=>p.test(t));}
 
 async function handleQuestion(questionText){
-  if(questionText===lastAnsweredQ||questionText.trim().length<15)return;
+  if(questionText===lastAnsweredQ||questionText.trim().length<15) return;
   lastAnsweredQ=questionText;
   const displayQ=questionText.length>130?'...'+questionText.slice(-130):questionText;
   const topic=classifyTopic(questionText);
   const company=selectedCompany==='lam'?'Lam Research':'Pure Storage';
-  const body=document.getElementById('aib');
-  clearHint('aib');
+
+  // ── Q&A 패널에 질문 표시 ──
+  const qaPanel=document.getElementById('qm');
+  qaPanel.querySelector('.hint')?.remove();
+  const qBubble=document.createElement('div');
+  qBubble.className='msg u';
+  qBubble.innerHTML='<span style="font-size:9px;opacity:.6;display:block;margin-bottom:3px">🎤 미팅 중 감지된 질문</span>'+esc(displayQ);
+  qaPanel.appendChild(qBubble);
+  const aBubble=document.createElement('div');
+  aBubble.className='msg a';
+  aBubble.innerHTML='<div class="thinking"><span></span><span></span><span></span></div>';
+  qaPanel.appendChild(aBubble);
+  qaPanel.scrollTop=qaPanel.scrollHeight;
+
+  // ── AI Interview Assistant 카드 ──
+  const aiBody=document.getElementById('aib');
+  aiBody.querySelector('.hint')?.remove();
   const card=document.createElement('div');card.className='ai-card';
   card.innerHTML=`
     <div class="ai-card-head">
       <div class="ai-card-q">❓ ${esc(displayQ)}</div>
-      <div class="ai-card-tags">
-        <span class="ai-tag topic">${topic}</span>
-        <span class="ai-tag">${company}</span>
-      </div>
+      <div class="ai-tags"><span class="ai-tag topic">${topic}</span><span class="ai-tag">${company}</span></div>
     </div>
     <div class="ai-card-body">
       <div class="ai-card-ans"><div class="thinking"><span></span><span></span><span></span></div></div>
     </div>`;
-  body.appendChild(card);body.scrollTop=body.scrollHeight;
+  aiBody.appendChild(card);aiBody.scrollTop=aiBody.scrollHeight;
+
   if(!API_KEY){
-    card.querySelector('.ai-card-ans').innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단에 API Key를 입력해주세요</span>';return;
+    const noKey='<span style="color:var(--accent3);font-size:12px">🔑 API Key를 입력해주세요</span>';
+    card.querySelector('.ai-card-ans').innerHTML=noKey;
+    aBubble.innerHTML=noKey;
+    return;
   }
+
   const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
-  try{
-    const result=await callClaude(
-      `You are an expert SAP interview coach providing real-time answer guidance.
-
-${ctx}
-
-RESPONSE FORMAT:
-1. Best spoken answer (3-5 sentences, natural conversational English, NO bullet points)
-2. One delivery tip (brief, practical)
-
-Keep it concise — the candidate needs to speak in seconds, not minutes.
-Do NOT include headers or labels — just the answer, then a line break, then "💡 Tip: [delivery tip]"`,
-      `Interview question: "${questionText}"\n\nProvide the best spoken answer for Junil.`,400);
+  callClaude(
+    buildInterviewPrompt(ctx, questionText),
+    `Interview question: "${questionText}"\n\nProvide the best spoken answer for Junil. Check notepad for relevant prepared content first.`,
+    550
+  ).then(result=>{
+    // AI Interview 카드 업데이트
     const parts=result.split(/💡 Tip:/i);
-    const ansHTML=esc(parts[0].trim());
+    const ansText=parts[0].trim();
     const tipHTML=parts[1]?`<div class="ai-tip"><strong>💡 Tip:</strong> ${esc(parts[1].trim())}</div>`:'';
-    card.querySelector('.ai-card-ans').innerHTML=ansHTML.replace(/\n/g,'<br>')+tipHTML;
-  }catch(e){
-    const msg=e.message==='NO_KEY'?'🔑 API Key를 입력해주세요':`오류: ${e.message}`;
-    card.querySelector('.ai-card-ans').innerHTML=`<span style="color:var(--danger);font-size:12px">${msg}</span>`;
-  }
-  body.scrollTop=body.scrollHeight;
+    card.querySelector('.ai-card-ans').innerHTML=esc(ansText).replace(/
+/g,'<br>')+tipHTML;
+    aiBody.scrollTop=aiBody.scrollHeight;
+
+    // Q&A 패널 답변 업데이트
+    aBubble.textContent=ansText;
+    qaPanel.scrollTop=qaPanel.scrollHeight;
+
+    // 메모장 저장
+    appendToNote('AI답변['+topic+']','Q: '+questionText+'
+A: '+ansText);
+  }).catch(e=>{
+    const errMsg=e.message==='NO_KEY'?'🔑 API Key를 입력해주세요':'오류: '+e.message;
+    card.querySelector('.ai-card-ans').innerHTML=`<span style="color:var(--danger);font-size:12px">${errMsg}</span>`;
+    aBubble.innerHTML=`<span style="color:var(--danger);font-size:12px">${errMsg}</span>`;
+  });
 }
 
 // ── DEMO ──
@@ -625,6 +773,7 @@ function appendFinal(text){
   if(interimEl){interimEl.remove();interimEl=null;}
   const n=document.createElement('span');n.className='ttext';n.textContent=text;
   body.appendChild(n);body.scrollTop=body.scrollHeight;
+  appendToNote('음성인식',text.trim());
 }
 function showInterim(text){
   const body=document.getElementById('tb');
@@ -644,11 +793,13 @@ async function ask(){
   if(!API_KEY){a.innerHTML='<span style="color:var(--accent3);font-size:12px">🔑 상단 API Key 입력창에 키를 입력 후 저장 버튼을 눌러주세요.</span>';return;}
   const ctx=selectedCompany==='lam'?CTX_LAM:CTX_PURE;
   const meetingCtx=transcript.slice(-2000)||'(없음)';
+    const noteCtx=getNoteContent().slice(-3000)||'(없음)';
   try{
     const result=await callClaude(
-      `You are an SAP interview coach and meeting assistant for Junil Jeong.\n\n${ctx}\n\nRECENT MEETING/INTERVIEW TRANSCRIPT:\n"""\n${meetingCtx}\n"""\n\nAnswer in Korean unless the question is in English. Be concise and practical.`,
+      `You are an SAP interview coach and meeting assistant for Junil Jeong.\n\n${ctx}\n\nRECENT MEETING/INTERVIEW TRANSCRIPT:\n"""\n${meetingCtx}\n"""\n\nNOTEPAD (저장된 메모):\n"""\n${noteCtx}\n"""\n\nAnswer in Korean unless the question is in English. Be concise and practical.`,
       q,700);
     a.textContent=result;
+    appendToNote('Q&A','Q: '+q+'\nA: '+result);
   }catch(e){a.innerHTML=`<span style="color:var(--danger);font-size:12px">오류: ${e.message}</span>`;}
   msgs.scrollTop=msgs.scrollHeight;
 }
