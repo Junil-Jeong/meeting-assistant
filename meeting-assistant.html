@@ -445,7 +445,7 @@ const QUESTION_PATTERNS=[
   /what (are|were|was) (your|the).*(challenge|result|impact|outcome|approach|biggest)/i,
   /give me an example/i,/what do you know about/i,
   /how (familiar|experienced) are you/i,
-  /what is (universal journal|s\/4|co-pa|co-pc|hana|acdoca|copa|copc|vertex|material ledger|actual costing)/i,
+  /what is (universal journal|s4hana|co-pa|co-pc|hana|acdoca|copa|copc|vertex|material ledger|actual costing)/i,
   /explain (the|your|how|what)/i,
   /(strength|weakness|accomplishment|achievement)/i,
   /where do you see yourself/i,
@@ -470,7 +470,7 @@ function classifyTopic(text){
   if(/(vertex|tax engine)/i.test(text)) return 'Vertex';
   if(/(co-pc|product cost|KKS1|CK11N|CKMLCP|material ledger|variance|BOM cost)/i.test(text)) return 'CO-PC';
   if(/(co-om|internal order|cost center|KO88|settlement)/i.test(text)) return 'CO-OM';
-  if(/(universal journal|ACDOCA|s\/4hana|new asset|FI-CO|real.time analytic)/i.test(text)) return 'S/4HANA';
+  if(/(universal journal|ACDOCA|s4hana|new asset|FI.CO|real.time analytic)/i.test(text)) return 'S/4HANA';
   if(/(full cycle|end.to.end|go-live|cutover|blueprint|UAT|SIT)/i.test(text)) return 'Full Cycle';
   if(/(requirements|BRD|functional spec|conference room pilot)/i.test(text)) return 'Requirements';
   if(/(stakeholder|controller|CFO|finance team)/i.test(text)) return 'Stakeholders';
@@ -569,7 +569,13 @@ function copyCmd(tid,bid){
 }
 
 // ── Mic ──
-function toggleMic(){running?stopMic():startMic();}
+function toggleMic(){
+  if(running || rec){
+    stopMic();
+  } else {
+    startMic();
+  }
+}
 async function startMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showMicError('Chrome 브라우저가 필요합니다.'); return; }
@@ -644,12 +650,17 @@ function hideMicError(){
   if(el) el.style.display='none';
 }
 function stopMic(){
-  running=false;if(rec){rec.stop();rec=null;}
+  running=false;
+  if(rec){
+    try{ rec.onend=null; rec.stop(); }catch(e){}
+    rec=null;
+  }
+  if(qDetectTimer){clearTimeout(qDetectTimer);qDetectTimer=null;}
   stopAudioMeter();
   setStatus('idle','대기 중');
-  document.getElementById('startBtn').textContent='▶ START';
-  document.getElementById('startBtn').className='btn btn-start';
-  if(interimEl){interimEl.remove();interimEl=null;}
+  const btn=document.getElementById('startBtn');
+  if(btn){btn.textContent='▶ START';btn.className='btn btn-start';}
+  if(interimEl){try{interimEl.remove();}catch(e){} interimEl=null;}
 }
 
 // ── Question detection ──
